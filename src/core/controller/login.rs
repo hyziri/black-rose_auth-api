@@ -14,23 +14,17 @@ pub struct CallbackParams {
 #[derive(Deserialize)]
 pub struct QueryParams {
     set_main: Option<bool>,
-    link_character: Option<bool>,
 }
 
 #[get("/login")]
 async fn login(session: Session, params: web::Query<QueryParams>) -> HttpResponse {
     let set_main = params.set_main.unwrap_or(false);
-    let link_character = params.link_character.unwrap_or(false);
     let auth_data = crate::core::service::login::login();
 
     session.insert("state", &auth_data.state).unwrap();
 
     if set_main {
         session.insert("set_main", set_main).unwrap();
-    }
-
-    if link_character {
-        session.insert("link_character", link_character).unwrap();
     }
 
     HttpResponse::Found()
@@ -47,7 +41,6 @@ async fn callback(
 ) -> HttpResponse {
     let state: Option<String> = session.get("state").unwrap_or(None);
     let set_main: Option<bool> = session.get("set_main").unwrap_or(None);
-    let link_character: Option<bool> = session.get("link_character").unwrap_or(None);
 
     let frontend_domain = env::var("FRONTEND_DOMAIN").expect("FRONTEND_DOMAIN must be set!");
 
@@ -58,7 +51,6 @@ async fn callback(
 
     session.remove("state");
     session.remove("set_main");
-    session.remove("link_character");
 
     let user: Option<String> = session.get("user").unwrap_or(None);
     let user: Option<i32> = user.map(|user| user.parse::<i32>().unwrap());
@@ -83,10 +75,6 @@ async fn callback(
             redirect_location = format!("http://{}/settings", frontend_domain)
         };
     };
-
-    if let Some(true) = link_character {
-        redirect_location = format!("http://{}/settings", frontend_domain)
-    }
 
     session
         .insert("user", format!("{}", ownership_entry.user_id))
