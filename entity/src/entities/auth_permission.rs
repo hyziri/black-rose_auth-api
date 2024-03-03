@@ -4,24 +4,19 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
-#[sea_orm(table_name = "auth_user")]
+#[sea_orm(table_name = "auth_permission")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
+    pub module: String,
+    pub name: String,
+    pub hidden: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::auth_user_character_ownership::Entity")]
-    AuthUserCharacterOwnership,
     #[sea_orm(has_many = "super::auth_user_permission::Entity")]
     AuthUserPermission,
-}
-
-impl Related<super::auth_user_character_ownership::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::AuthUserCharacterOwnership.def()
-    }
 }
 
 impl Related<super::auth_user_permission::Entity> for Entity {

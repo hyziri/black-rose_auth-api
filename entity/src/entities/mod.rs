@@ -2,8 +2,10 @@
 
 pub mod prelude;
 
+pub mod auth_permission;
 pub mod auth_user;
 pub mod auth_user_character_ownership;
+pub mod auth_user_permission;
 pub mod eve_alliance;
 pub mod eve_character;
 pub mod eve_corporation;

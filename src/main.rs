@@ -10,6 +10,7 @@ use actix_web::middleware::DefaultHeaders;
 use actix_web::web::Data;
 use actix_web::{App, HttpServer};
 use core::routes::user_service;
+use core::seed::{create_admin, seed_auth_permissions};
 use eve_esi::initialize_eve_esi;
 use std::env;
 
@@ -35,6 +36,9 @@ async fn main() -> std::io::Result<()> {
     let application_email = env::var("APPLICATION_EMAIL").expect("APPLICATION_EMAIL must be set!");
 
     initialize_eve_esi(application_name, application_email);
+
+    let _ = seed_auth_permissions(&db).await;
+    let _ = create_admin(&db).await;
 
     HttpServer::new(move || {
         let cors = Cors::default()

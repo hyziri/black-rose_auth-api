@@ -21,7 +21,7 @@ pub enum Relation {
     AuthUserCharacterOwnership,
     #[sea_orm(
         belongs_to = "super::eve_corporation::Entity",
-        from = "Column::CharacterId",
+        from = "Column::CorporationId",
         to = "super::eve_corporation::Column::CorporationId",
         on_update = "NoAction",
         on_delete = "NoAction"

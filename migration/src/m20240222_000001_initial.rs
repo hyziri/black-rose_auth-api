@@ -363,7 +363,7 @@ enum EveCharacter {
 }
 
 #[derive(DeriveIden)]
-enum AuthUser {
+pub enum AuthUser {
     Table,
     Id,
 }

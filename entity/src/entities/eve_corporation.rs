@@ -25,7 +25,7 @@ pub enum Relation {
         on_delete = "NoAction"
     )]
     EveAlliance,
-    #[sea_orm(has_one = "super::eve_character::Entity")]
+    #[sea_orm(has_many = "super::eve_character::Entity")]
     EveCharacter,
 }
 

@@ -126,3 +126,22 @@ pub async fn get_user_characters(
         Err(_) => HttpResponse::InternalServerError().body("Error getting user info."),
     }
 }
+
+#[get("/permissions")]
+pub async fn get_user_permissions(
+    db: web::Data<sea_orm::DatabaseConnection>,
+    session: Session,
+) -> HttpResponse {
+    let user_id = match get_user_id_from_session(session).await {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+
+    match crate::core::service::user::get_user_permissions(&db, user_id).await {
+        Ok(permissions) => HttpResponse::Found().json(permissions),
+        Err(err) => {
+            println!("{}", err);
+            HttpResponse::InternalServerError().body("Error getting user permissions.")
+        }
+    }
+}
