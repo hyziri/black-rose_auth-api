@@ -4,23 +4,21 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
-#[sea_orm(table_name = "eve_corporation")]
+#[sea_orm(table_name = "auth_group_category")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
-    #[sea_orm(unique)]
-    pub corporation_id: i32,
-    pub corporation_name: String,
+    pub name: String,
     pub alliance_id: Option<i32>,
-    pub last_updated: DateTime,
+    pub corporation_id: Option<i32>,
+    pub exclusive_groups: bool,
+    pub shared_category: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(has_many = "super::auth_group::Entity")]
     AuthGroup,
-    #[sea_orm(has_many = "super::auth_group_category::Entity")]
-    AuthGroupCategory,
     #[sea_orm(
         belongs_to = "super::eve_alliance::Entity",
         from = "Column::AllianceId",
@@ -29,19 +27,19 @@ pub enum Relation {
         on_delete = "NoAction"
     )]
     EveAlliance,
-    #[sea_orm(has_many = "super::eve_character::Entity")]
-    EveCharacter,
+    #[sea_orm(
+        belongs_to = "super::eve_corporation::Entity",
+        from = "Column::CorporationId",
+        to = "super::eve_corporation::Column::CorporationId",
+        on_update = "NoAction",
+        on_delete = "NoAction"
+    )]
+    EveCorporation,
 }
 
 impl Related<super::auth_group::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::AuthGroup.def()
-    }
-}
-
-impl Related<super::auth_group_category::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::AuthGroupCategory.def()
     }
 }
 
@@ -51,9 +49,9 @@ impl Related<super::eve_alliance::Entity> for Entity {
     }
 }
 
-impl Related<super::eve_character::Entity> for Entity {
+impl Related<super::eve_corporation::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::EveCharacter.def()
+        Relation::EveCorporation.def()
     }
 }
 

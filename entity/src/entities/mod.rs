@@ -2,6 +2,10 @@
 
 pub mod prelude;
 
+pub mod auth_group;
+pub mod auth_group_category;
+pub mod auth_group_permission;
+pub mod auth_group_user;
 pub mod auth_permission;
 pub mod auth_user;
 pub mod auth_user_character_ownership;
