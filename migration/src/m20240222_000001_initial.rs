@@ -335,7 +335,7 @@ impl MigrationTrait for Migration {
 }
 
 #[derive(DeriveIden)]
-enum EveAlliance {
+pub enum EveAlliance {
     Table,
     Id,
     AllianceId,
@@ -343,7 +343,7 @@ enum EveAlliance {
 }
 
 #[derive(DeriveIden)]
-enum EveCorporation {
+pub enum EveCorporation {
     Table,
     Id,
     CorporationId,
