@@ -29,6 +29,7 @@ pub async fn create_alliance(
             let alliance = entity::eve_alliance::ActiveModel {
                 alliance_id: ActiveValue::Set(alliance_id),
                 alliance_name: ActiveValue::Set(alliance.name),
+                executor: ActiveValue::Set(alliance.executor_corporation_id),
                 ..Default::default()
             };
 

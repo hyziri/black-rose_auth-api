@@ -30,6 +30,7 @@ impl MigrationTrait for Migration {
                             .string()
                             .not_null(),
                     )
+                    .col(ColumnDef::new(EveAlliance::Executor).integer())
                     .to_owned(),
             )
             .await?;
@@ -58,6 +59,7 @@ impl MigrationTrait for Migration {
                             .not_null(),
                     )
                     .col(ColumnDef::new(EveCorporation::AllianceId).integer())
+                    .col(ColumnDef::new(EveCorporation::Ceo).integer().not_null())
                     .col(
                         ColumnDef::new(EveCorporation::LastUpdated)
                             .timestamp()
@@ -340,6 +342,7 @@ pub enum EveAlliance {
     Id,
     AllianceId,
     AllianceName,
+    Executor,
 }
 
 #[derive(DeriveIden)]
@@ -349,6 +352,7 @@ pub enum EveCorporation {
     CorporationId,
     CorporationName,
     AllianceId,
+    Ceo,
     LastUpdated,
 }
 

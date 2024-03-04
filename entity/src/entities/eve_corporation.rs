@@ -12,6 +12,7 @@ pub struct Model {
     pub corporation_id: i32,
     pub corporation_name: String,
     pub alliance_id: Option<i32>,
+    pub ceo: i32,
     pub last_updated: DateTime,
 }
 

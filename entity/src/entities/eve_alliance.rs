@@ -11,6 +11,7 @@ pub struct Model {
     #[sea_orm(unique)]
     pub alliance_id: i32,
     pub alliance_name: String,
+    pub executor: Option<i32>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

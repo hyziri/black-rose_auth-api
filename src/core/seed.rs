@@ -40,11 +40,11 @@ pub async fn create_admin(db: &DatabaseConnection) -> Result<(), sea_orm::DbErr>
 
         let _: () = con.set_ex("admin_setup_code", &random_string, 300).unwrap();
 
-        let frontend_domain = env::var("FRONTEND_DOMAIN").expect("FRONTEND_DOMAIN must be set!");
+        let backend_domain = env::var("BACKEND_DOMAIN").expect("BACKEND_DOMAIN must be set!");
 
         let login_link = format!(
             "http://{}/auth/login?admin_setup={}",
-            frontend_domain, random_string
+            backend_domain, random_string
         );
 
         println!(
