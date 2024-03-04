@@ -2,6 +2,8 @@
 
 pub use super::auth_group::Entity as AuthGroup;
 pub use super::auth_group_category::Entity as AuthGroupCategory;
+pub use super::auth_group_filter::Entity as AuthGroupFilter;
+pub use super::auth_group_filter_rule::Entity as AuthGroupFilterRule;
 pub use super::auth_group_permission::Entity as AuthGroupPermission;
 pub use super::auth_group_user::Entity as AuthGroupUser;
 pub use super::auth_permission::Entity as AuthPermission;

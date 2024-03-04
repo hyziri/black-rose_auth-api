@@ -4,6 +4,8 @@ pub mod prelude;
 
 pub mod auth_group;
 pub mod auth_group_category;
+pub mod auth_group_filter;
+pub mod auth_group_filter_rule;
 pub mod auth_group_permission;
 pub mod auth_group_user;
 pub mod auth_permission;

@@ -10,10 +10,11 @@ pub struct Model {
     pub id: i32,
     pub name: String,
     pub category_id: i32,
-    pub alliance_id: Option<i32>,
-    pub corporation_id: Option<i32>,
+    pub owner_type: Option<String>,
+    pub owner_id: Option<i32>,
     pub confidential: bool,
     pub group_type: String,
+    pub filter_type: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -26,31 +27,23 @@ pub enum Relation {
         on_delete = "NoAction"
     )]
     AuthGroupCategory,
+    #[sea_orm(has_many = "super::auth_group_filter::Entity")]
+    AuthGroupFilter,
     #[sea_orm(has_many = "super::auth_group_permission::Entity")]
     AuthGroupPermission,
     #[sea_orm(has_many = "super::auth_group_user::Entity")]
     AuthGroupUser,
-    #[sea_orm(
-        belongs_to = "super::eve_alliance::Entity",
-        from = "Column::AllianceId",
-        to = "super::eve_alliance::Column::AllianceId",
-        on_update = "NoAction",
-        on_delete = "NoAction"
-    )]
-    EveAlliance,
-    #[sea_orm(
-        belongs_to = "super::eve_corporation::Entity",
-        from = "Column::CorporationId",
-        to = "super::eve_corporation::Column::CorporationId",
-        on_update = "NoAction",
-        on_delete = "NoAction"
-    )]
-    EveCorporation,
 }
 
 impl Related<super::auth_group_category::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::AuthGroupCategory.def()
+    }
+}
+
+impl Related<super::auth_group_filter::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::AuthGroupFilter.def()
     }
 }
 
@@ -63,18 +56,6 @@ impl Related<super::auth_group_permission::Entity> for Entity {
 impl Related<super::auth_group_user::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::AuthGroupUser.def()
-    }
-}
-
-impl Related<super::eve_alliance::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::EveAlliance.def()
-    }
-}
-
-impl Related<super::eve_corporation::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::EveCorporation.def()
     }
 }
 
