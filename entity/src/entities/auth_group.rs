@@ -9,9 +9,6 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
     pub name: String,
-    pub category_id: i32,
-    pub owner_type: Option<String>,
-    pub owner_id: Option<i32>,
     pub confidential: bool,
     pub group_type: String,
     pub filter_type: String,
@@ -19,37 +16,15 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(
-        belongs_to = "super::auth_group_category::Entity",
-        from = "Column::CategoryId",
-        to = "super::auth_group_category::Column::Id",
-        on_update = "NoAction",
-        on_delete = "NoAction"
-    )]
-    AuthGroupCategory,
     #[sea_orm(has_many = "super::auth_group_filter::Entity")]
     AuthGroupFilter,
-    #[sea_orm(has_many = "super::auth_group_permission::Entity")]
-    AuthGroupPermission,
     #[sea_orm(has_many = "super::auth_group_user::Entity")]
     AuthGroupUser,
-}
-
-impl Related<super::auth_group_category::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::AuthGroupCategory.def()
-    }
 }
 
 impl Related<super::auth_group_filter::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::AuthGroupFilter.def()
-    }
-}
-
-impl Related<super::auth_group_permission::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::AuthGroupPermission.def()
     }
 }
 

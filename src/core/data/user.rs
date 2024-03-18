@@ -169,3 +169,32 @@ pub async fn change_main(
 
     Ok(None)
 }
+
+pub async fn set_user_as_admin(
+    db: &DatabaseConnection,
+    user_id: i32,
+) -> Result<Option<User>, sea_orm::DbErr> {
+    let user = entity::prelude::AuthUser::find_by_id(user_id)
+        .one(db)
+        .await?;
+
+    match user {
+        Some(user) => {
+            let mut user: entity::auth_user::ActiveModel = user.into();
+
+            user.admin = Set(true);
+
+            let user = user.update(db).await?;
+
+            Ok(Some(user))
+        }
+        None => Ok(None),
+    }
+}
+
+pub async fn get_users_with_admin(db: &DatabaseConnection) -> Result<Vec<User>, sea_orm::DbErr> {
+    entity::prelude::AuthUser::find()
+        .filter(entity::auth_user::Column::Admin.eq(true))
+        .all(db)
+        .await
+}

@@ -3,14 +3,12 @@ use redis::Commands;
 use sea_orm::DatabaseConnection;
 use std::env;
 
-use crate::core::data::permission::get_users_with_permission;
-
-use super::data::permission::create_permission;
+use crate::core::data::user::get_users_with_admin;
 
 pub async fn seed_auth_permissions(db: &DatabaseConnection) -> Result<(), sea_orm::DbErr> {
     let module_name = "Auth".to_string();
 
-    create_permission(db, &module_name, "Admin", true).await?;
+    // create_permission(db, &module_name, "Admin", true).await?;
 
     Ok(())
 }
@@ -28,7 +26,7 @@ pub async fn create_admin(db: &DatabaseConnection) -> Result<(), sea_orm::DbErr>
         random_string
     }
 
-    let existing_admin = get_users_with_permission(db, "Auth", "Admin").await?;
+    let existing_admin = get_users_with_admin(db).await?;
 
     if existing_admin.is_empty() {
         let redis_url = env::var("REDIS_URL").expect("REDIS_URL must be set!");

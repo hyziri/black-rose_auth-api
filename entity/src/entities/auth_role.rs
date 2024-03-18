@@ -4,25 +4,22 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
-#[sea_orm(table_name = "eve_alliance")]
+#[sea_orm(table_name = "auth_role")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
-    #[sea_orm(unique)]
-    pub alliance_id: i32,
-    pub alliance_name: String,
-    pub executor: Option<i32>,
+    pub name: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::eve_corporation::Entity")]
-    EveCorporation,
+    #[sea_orm(has_many = "super::auth_role_permissions::Entity")]
+    AuthRolePermissions,
 }
 
-impl Related<super::eve_corporation::Entity> for Entity {
+impl Related<super::auth_role_permissions::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::EveCorporation.def()
+        Relation::AuthRolePermissions.def()
     }
 }
 

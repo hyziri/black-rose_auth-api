@@ -4,10 +4,7 @@ use redis::Commands;
 use serde::Deserialize;
 use std::env;
 
-use crate::core::data::{
-    permission::{create_user_permission, get_permission_by_name},
-    user::change_main,
-};
+use crate::core::data::user::{change_main, set_user_as_admin};
 
 #[derive(Deserialize)]
 pub struct CallbackParams {
@@ -90,9 +87,7 @@ async fn callback(
     let ownership_entry =
         match crate::core::service::login::callback(&db, params.code.clone(), user).await {
             Ok(entry) => entry,
-            Err(error) => {
-                println!("{}", error);
-
+            Err(_) => {
                 return HttpResponse::InternalServerError()
                     .body("There was an issue logging you in, please try again.");
             }
@@ -104,22 +99,14 @@ async fn callback(
         let client = redis::Client::open(format!("redis://{}", redis_url)).unwrap();
         let mut con = client.get_connection().unwrap();
 
-        let permission_id = match get_permission_by_name(&db, "Auth", "Admin").await {
-            Ok(permission) => match permission {
-                Some(permission) => permission.id,
+        match set_user_as_admin(&db, ownership_entry.user_id).await {
+            Ok(user) => match user {
+                Some(_) => (),
                 None => {
                     return HttpResponse::InternalServerError()
                         .body("There was an issue logging you in, please try again.")
                 }
             },
-            Err(_) => {
-                return HttpResponse::InternalServerError()
-                    .body("There was an issue logging you in, please try again.")
-            }
-        };
-
-        match create_user_permission(&db, permission_id, ownership_entry.user_id).await {
-            Ok(_) => (),
             Err(_) => {
                 return HttpResponse::InternalServerError()
                     .body("There was an issue logging you in, please try again.")

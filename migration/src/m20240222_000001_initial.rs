@@ -166,6 +166,18 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
+                    .col(
+                        ColumnDef::new(AuthUser::Admin)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .col(
+                        ColumnDef::new(AuthUser::Created)
+                            .timestamp()
+                            .not_null()
+                            .default(Utc::now().naive_utc()),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -370,6 +382,8 @@ enum EveCharacter {
 pub enum AuthUser {
     Table,
     Id,
+    Admin,
+    Created,
 }
 
 #[derive(DeriveIden)]

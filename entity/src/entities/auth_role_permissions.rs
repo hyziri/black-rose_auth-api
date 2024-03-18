@@ -4,11 +4,11 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
-#[sea_orm(table_name = "auth_user_permission")]
+#[sea_orm(table_name = "auth_role_permissions")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
-    pub user_id: i32,
+    pub role_id: i32,
     pub permission_id: i32,
 }
 
@@ -23,13 +23,13 @@ pub enum Relation {
     )]
     AuthPermission,
     #[sea_orm(
-        belongs_to = "super::auth_user::Entity",
-        from = "Column::UserId",
-        to = "super::auth_user::Column::Id",
+        belongs_to = "super::auth_role::Entity",
+        from = "Column::RoleId",
+        to = "super::auth_role::Column::Id",
         on_update = "NoAction",
         on_delete = "NoAction"
     )]
-    AuthUser,
+    AuthRole,
 }
 
 impl Related<super::auth_permission::Entity> for Entity {
@@ -38,9 +38,9 @@ impl Related<super::auth_permission::Entity> for Entity {
     }
 }
 
-impl Related<super::auth_user::Entity> for Entity {
+impl Related<super::auth_role::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::AuthUser.def()
+        Relation::AuthRole.def()
     }
 }
 
