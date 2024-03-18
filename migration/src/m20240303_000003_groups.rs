@@ -1,6 +1,7 @@
 use sea_orm_migration::prelude::*;
 
 use crate::m20240222_000001_initial::AuthUser;
+use crate::m20240302_000002_permissions::AuthRole;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -181,10 +182,74 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
+        manager
+            .create_table(
+                Table::create()
+                    .table(AuthGroupRoles::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(AuthGroupRoles::Id)
+                            .integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(AuthGroupRoles::GroupId).integer().not_null())
+                    .col(ColumnDef::new(AuthGroupRoles::RoleId).integer().not_null())
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_foreign_key(
+                sea_query::ForeignKey::create()
+                    .name("fk-auth_group_roles-auth_group")
+                    .from_tbl(AuthGroupRoles::Table)
+                    .from_col(AuthGroupRoles::GroupId)
+                    .to_tbl(AuthGroup::Table)
+                    .to_col(AuthGroup::Id)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_foreign_key(
+                sea_query::ForeignKey::create()
+                    .name("fk-auth_group_roles-auth_role")
+                    .from_tbl(AuthGroupRoles::Table)
+                    .from_col(AuthGroupRoles::RoleId)
+                    .to_tbl(AuthRole::Table)
+                    .to_col(AuthRole::Id)
+                    .to_owned(),
+            )
+            .await?;
+
         Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_foreign_key(
+                sea_query::ForeignKey::drop()
+                    .name("fk-auth_group_roles-auth_role")
+                    .table(AuthGroupRoles::Table)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .drop_foreign_key(
+                sea_query::ForeignKey::drop()
+                    .name("fk-auth_group_roles-auth_group")
+                    .table(AuthGroupRoles::Table)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .drop_table(Table::drop().table(AuthGroupRoles::Table).to_owned())
+            .await?;
+
         manager
             .drop_foreign_key(
                 sea_query::ForeignKey::drop()
@@ -283,4 +348,12 @@ enum AuthGroupFilterRule {
     Criteria,      // Group, Corporation, Alliance, Role
     CriteriaType,  // IS, IS NOT, GREATER THAN, LESS THAN
     CriteriaValue, // GroupId, CorporationId, AllianceId, Corp CEO/Executor
+}
+
+#[derive(DeriveIden)]
+enum AuthGroupRoles {
+    Table,
+    Id,
+    GroupId,
+    RoleId,
 }
