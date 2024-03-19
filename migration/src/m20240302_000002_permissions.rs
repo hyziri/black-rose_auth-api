@@ -102,17 +102,17 @@ impl MigrationTrait for Migration {
         manager
             .create_table(
                 Table::create()
-                    .table(AuthUserRoles::Table)
+                    .table(AuthRoleUsers::Table)
                     .if_not_exists()
                     .col(
-                        ColumnDef::new(AuthUserRoles::Id)
+                        ColumnDef::new(AuthRoleUsers::Id)
                             .integer()
                             .not_null()
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(AuthUserRoles::RoleId).integer().not_null())
-                    .col(ColumnDef::new(AuthUserRoles::UserId).integer().not_null())
+                    .col(ColumnDef::new(AuthRoleUsers::RoleId).integer().not_null())
+                    .col(ColumnDef::new(AuthRoleUsers::UserId).integer().not_null())
                     .to_owned(),
             )
             .await?;
@@ -120,9 +120,9 @@ impl MigrationTrait for Migration {
         manager
             .create_foreign_key(
                 sea_query::ForeignKey::create()
-                    .name("fk-auth_user_roles-auth_role")
-                    .from_tbl(AuthUserRoles::Table)
-                    .from_col(AuthUserRoles::RoleId)
+                    .name("fk-auth_role_users-auth_role")
+                    .from_tbl(AuthRoleUsers::Table)
+                    .from_col(AuthRoleUsers::RoleId)
                     .to_tbl(AuthRole::Table)
                     .to_col(AuthRole::Id)
                     .to_owned(),
@@ -132,9 +132,9 @@ impl MigrationTrait for Migration {
         manager
             .create_foreign_key(
                 sea_query::ForeignKey::create()
-                    .name("fk-auth_user_roles-auth_user")
-                    .from_tbl(AuthUserRoles::Table)
-                    .from_col(AuthUserRoles::UserId)
+                    .name("fk-auth_role_users-auth_user")
+                    .from_tbl(AuthRoleUsers::Table)
+                    .from_col(AuthRoleUsers::UserId)
                     .to_tbl(AuthUser::Table)
                     .to_col(AuthUser::Id)
                     .to_owned(),
@@ -148,8 +148,8 @@ impl MigrationTrait for Migration {
         manager
             .drop_foreign_key(
                 sea_query::ForeignKey::drop()
-                    .name("fk-auth_user_roles-auth_user")
-                    .table(AuthUserRoles::Table)
+                    .name("fk-auth_role_users-auth_user")
+                    .table(AuthRoleUsers::Table)
                     .to_owned(),
             )
             .await?;
@@ -157,14 +157,14 @@ impl MigrationTrait for Migration {
         manager
             .drop_foreign_key(
                 sea_query::ForeignKey::drop()
-                    .name("fk-auth_user_roles-auth_role")
-                    .table(AuthUserRoles::Table)
+                    .name("fk-auth_role_users-auth_role")
+                    .table(AuthRoleUsers::Table)
                     .to_owned(),
             )
             .await?;
 
         manager
-            .drop_table(Table::drop().table(AuthUserRoles::Table).to_owned())
+            .drop_table(Table::drop().table(AuthRoleUsers::Table).to_owned())
             .await?;
 
         manager
@@ -226,7 +226,7 @@ enum AuthRolePermissions {
 }
 
 #[derive(DeriveIden)]
-enum AuthUserRoles {
+enum AuthRoleUsers {
     Table,
     Id,
     UserId,

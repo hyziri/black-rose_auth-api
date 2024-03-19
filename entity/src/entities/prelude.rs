@@ -3,10 +3,12 @@
 pub use super::auth_group::Entity as AuthGroup;
 pub use super::auth_group_filter::Entity as AuthGroupFilter;
 pub use super::auth_group_filter_rule::Entity as AuthGroupFilterRule;
+pub use super::auth_group_roles::Entity as AuthGroupRoles;
 pub use super::auth_group_user::Entity as AuthGroupUser;
 pub use super::auth_permission::Entity as AuthPermission;
 pub use super::auth_role::Entity as AuthRole;
 pub use super::auth_role_permissions::Entity as AuthRolePermissions;
+pub use super::auth_role_users::Entity as AuthRoleUsers;
 pub use super::auth_user::Entity as AuthUser;
 pub use super::auth_user_character_ownership::Entity as AuthUserCharacterOwnership;
 pub use super::eve_alliance::Entity as EveAlliance;

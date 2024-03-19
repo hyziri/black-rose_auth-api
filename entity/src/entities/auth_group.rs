@@ -18,6 +18,8 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(has_many = "super::auth_group_filter::Entity")]
     AuthGroupFilter,
+    #[sea_orm(has_many = "super::auth_group_roles::Entity")]
+    AuthGroupRoles,
     #[sea_orm(has_many = "super::auth_group_user::Entity")]
     AuthGroupUser,
 }
@@ -25,6 +27,12 @@ pub enum Relation {
 impl Related<super::auth_group_filter::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::AuthGroupFilter.def()
+    }
+}
+
+impl Related<super::auth_group_roles::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::AuthGroupRoles.def()
     }
 }
 

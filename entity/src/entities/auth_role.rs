@@ -13,13 +13,29 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
+    #[sea_orm(has_many = "super::auth_group_roles::Entity")]
+    AuthGroupRoles,
     #[sea_orm(has_many = "super::auth_role_permissions::Entity")]
     AuthRolePermissions,
+    #[sea_orm(has_many = "super::auth_role_users::Entity")]
+    AuthRoleUsers,
+}
+
+impl Related<super::auth_group_roles::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::AuthGroupRoles.def()
+    }
 }
 
 impl Related<super::auth_role_permissions::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::AuthRolePermissions.def()
+    }
+}
+
+impl Related<super::auth_role_users::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::AuthRoleUsers.def()
     }
 }
 
