@@ -1,7 +1,7 @@
 use sea_orm_migration::prelude::*;
 
 use crate::m20240222_000001_initial::AuthUser;
-use crate::m20240302_000002_permissions::AuthRole;
+use crate::m20240302_000002_permissions::AuthPermission;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -185,17 +185,25 @@ impl MigrationTrait for Migration {
         manager
             .create_table(
                 Table::create()
-                    .table(AuthGroupRoles::Table)
+                    .table(AuthGroupPermission::Table)
                     .if_not_exists()
                     .col(
-                        ColumnDef::new(AuthGroupRoles::Id)
+                        ColumnDef::new(AuthGroupPermission::Id)
                             .integer()
                             .not_null()
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(AuthGroupRoles::GroupId).integer().not_null())
-                    .col(ColumnDef::new(AuthGroupRoles::RoleId).integer().not_null())
+                    .col(
+                        ColumnDef::new(AuthGroupPermission::GroupId)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AuthGroupPermission::PermissionId)
+                            .integer()
+                            .not_null(),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -203,9 +211,9 @@ impl MigrationTrait for Migration {
         manager
             .create_foreign_key(
                 sea_query::ForeignKey::create()
-                    .name("fk-auth_group_roles-auth_group")
-                    .from_tbl(AuthGroupRoles::Table)
-                    .from_col(AuthGroupRoles::GroupId)
+                    .name("fk-auth_group_permission-auth_group")
+                    .from_tbl(AuthGroupPermission::Table)
+                    .from_col(AuthGroupPermission::GroupId)
                     .to_tbl(AuthGroup::Table)
                     .to_col(AuthGroup::Id)
                     .to_owned(),
@@ -215,11 +223,11 @@ impl MigrationTrait for Migration {
         manager
             .create_foreign_key(
                 sea_query::ForeignKey::create()
-                    .name("fk-auth_group_roles-auth_role")
-                    .from_tbl(AuthGroupRoles::Table)
-                    .from_col(AuthGroupRoles::RoleId)
-                    .to_tbl(AuthRole::Table)
-                    .to_col(AuthRole::Id)
+                    .name("fk-auth_group_permission-auth_permission")
+                    .from_tbl(AuthGroupPermission::Table)
+                    .from_col(AuthGroupPermission::PermissionId)
+                    .to_tbl(AuthPermission::Table)
+                    .to_col(AuthPermission::Id)
                     .to_owned(),
             )
             .await?;
@@ -231,8 +239,8 @@ impl MigrationTrait for Migration {
         manager
             .drop_foreign_key(
                 sea_query::ForeignKey::drop()
-                    .name("fk-auth_group_roles-auth_role")
-                    .table(AuthGroupRoles::Table)
+                    .name("fk-auth_group_permission-auth_permission")
+                    .table(AuthGroupPermission::Table)
                     .to_owned(),
             )
             .await?;
@@ -240,14 +248,14 @@ impl MigrationTrait for Migration {
         manager
             .drop_foreign_key(
                 sea_query::ForeignKey::drop()
-                    .name("fk-auth_group_roles-auth_group")
-                    .table(AuthGroupRoles::Table)
+                    .name("fk-auth_group_permission-auth_group")
+                    .table(AuthGroupPermission::Table)
                     .to_owned(),
             )
             .await?;
 
         manager
-            .drop_table(Table::drop().table(AuthGroupRoles::Table).to_owned())
+            .drop_table(Table::drop().table(AuthGroupPermission::Table).to_owned())
             .await?;
 
         manager
@@ -351,9 +359,9 @@ enum AuthGroupFilterRule {
 }
 
 #[derive(DeriveIden)]
-enum AuthGroupRoles {
+enum AuthGroupPermission {
     Table,
     Id,
     GroupId,
-    RoleId,
+    PermissionId,
 }
