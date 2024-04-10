@@ -9,13 +9,13 @@ members = [".", "migration", "entity"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-eve_oauth2 = { path = "/home/hyziri/blackrose/eve_oauth2" }
-eve_esi = { path = "/home/hyziri/blackrose/eve_esi" }
+eve_esi = "0.1.0"
+eve_oauth2 = "0.2.0"
 dotenv = "0.15.0"
 migration = { path = "migration" } 
 entity = { path = "entity" } 
 sea-orm = { version = "0.12", features = [ "sqlx-postgres", "runtime-tokio-rustls", "macros", "with-chrono" ] }
-redis = "0.24.0"
+redis = "0.25.3"
 rand = "0.8.5"
 chrono = "0.4.34"
 serde = { version = "1.0.197", features = ["derive"] }

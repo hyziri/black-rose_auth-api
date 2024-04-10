@@ -29,9 +29,9 @@ pub async fn create_admin(db: &DatabaseConnection) -> Result<(), sea_orm::DbErr>
     let existing_admin = get_users_with_admin(db).await?;
 
     if existing_admin.is_empty() {
-        let redis_url = env::var("REDIS_URL").expect("REDIS_URL must be set!");
+        let valkey_url = env::var("VALKEY_URL").expect("VALKEY_URL must be set!");
 
-        let client = redis::Client::open(format!("redis://{}", redis_url)).unwrap();
+        let client = redis::Client::open(format!("redis://{}", valkey_url)).unwrap();
         let mut con = client.get_connection().unwrap();
 
         let random_string = generate_random_string();

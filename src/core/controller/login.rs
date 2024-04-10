@@ -32,9 +32,9 @@ async fn login(session: Session, params: web::Query<QueryParams>) -> HttpRespons
 
     match admin_code {
         Some(admin_code) => {
-            let redis_url = env::var("REDIS_URL").expect("REDIS_URL must be set!");
+            let valkey_url = env::var("VALKEY_URL").expect("VALKEY_URL must be set!");
 
-            let client = redis::Client::open(format!("redis://{}", redis_url)).unwrap();
+            let client = redis::Client::open(format!("redis://{}", valkey_url)).unwrap();
             let mut con = client.get_connection().unwrap();
 
             let admin_setup_code: Result<String, _> = con.get("admin_setup_code");
@@ -94,9 +94,9 @@ async fn callback(
         };
 
     if let Some(true) = set_as_admin {
-        let redis_url = env::var("REDIS_URL").expect("REDIS_URL must be set!");
+        let valkey_url = env::var("VALKEY_URL").expect("VALKEY_URL must be set!");
 
-        let client = redis::Client::open(format!("redis://{}", redis_url)).unwrap();
+        let client = redis::Client::open(format!("redis://{}", valkey_url)).unwrap();
         let mut con = client.get_connection().unwrap();
 
         match set_user_as_admin(&db, ownership_entry.user_id).await {
