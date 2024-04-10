@@ -30,6 +30,7 @@ impl MigrationTrait for Migration {
                             .string()
                             .not_null(),
                     )
+                    .col(ColumnDef::new(EveAlliance::Executor).integer())
                     .to_owned(),
             )
             .await?;
@@ -58,6 +59,7 @@ impl MigrationTrait for Migration {
                             .not_null(),
                     )
                     .col(ColumnDef::new(EveCorporation::AllianceId).integer())
+                    .col(ColumnDef::new(EveCorporation::Ceo).integer().not_null())
                     .col(
                         ColumnDef::new(EveCorporation::LastUpdated)
                             .timestamp()
@@ -163,6 +165,18 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .auto_increment()
                             .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(AuthUser::Admin)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .col(
+                        ColumnDef::new(AuthUser::Created)
+                            .timestamp()
+                            .not_null()
+                            .default(Utc::now().naive_utc()),
                     )
                     .to_owned(),
             )
@@ -335,20 +349,22 @@ impl MigrationTrait for Migration {
 }
 
 #[derive(DeriveIden)]
-enum EveAlliance {
+pub enum EveAlliance {
     Table,
     Id,
     AllianceId,
     AllianceName,
+    Executor,
 }
 
 #[derive(DeriveIden)]
-enum EveCorporation {
+pub enum EveCorporation {
     Table,
     Id,
     CorporationId,
     CorporationName,
     AllianceId,
+    Ceo,
     LastUpdated,
 }
 
@@ -363,9 +379,11 @@ enum EveCharacter {
 }
 
 #[derive(DeriveIden)]
-enum AuthUser {
+pub enum AuthUser {
     Table,
     Id,
+    Admin,
+    Created,
 }
 
 #[derive(DeriveIden)]

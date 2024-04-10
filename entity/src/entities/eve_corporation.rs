@@ -12,6 +12,7 @@ pub struct Model {
     pub corporation_id: i32,
     pub corporation_name: String,
     pub alliance_id: Option<i32>,
+    pub ceo: i32,
     pub last_updated: DateTime,
 }
 
@@ -25,7 +26,7 @@ pub enum Relation {
         on_delete = "NoAction"
     )]
     EveAlliance,
-    #[sea_orm(has_one = "super::eve_character::Entity")]
+    #[sea_orm(has_many = "super::eve_character::Entity")]
     EveCharacter,
 }
 

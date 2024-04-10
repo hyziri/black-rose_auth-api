@@ -10,6 +10,7 @@ use actix_web::middleware::DefaultHeaders;
 use actix_web::web::Data;
 use actix_web::{App, HttpServer};
 use core::routes::user_service;
+use core::seed::{create_admin, seed_auth_permissions};
 use eve_esi::initialize_eve_esi;
 use std::env;
 
@@ -25,16 +26,19 @@ async fn main() -> std::io::Result<()> {
 
     let frontend_domain = env::var("FRONTEND_DOMAIN").expect("FRONTEND_DOMAIN must be set!");
     let application_port = env::var("APPLICATION_PORT").unwrap_or_else(|_| String::from("8080"));
-    let application_secret_key =
-        env::var("APPLICATION_SECRET").expect("APPLICATION_SECRET must be set!");
-    let redis_url = env::var("REDIS_URL").expect("REDIS_URL must be set!");
+    let application_master_key =
+        env::var("APPLICATION_MASTER_KEY").expect("APPLICATION_MASTER_KEY must be set!");
+    let valkey_url = env::var("VALKEY_URL").expect("VALKEY_URL must be set!");
 
-    let secret_key = Key::derive_from(application_secret_key.as_bytes());
+    let secret_key = Key::derive_from(application_master_key.as_bytes());
 
     let application_name = env::var("APPLICATION_NAME").expect("APPLICATION_NAME must be set!");
     let application_email = env::var("APPLICATION_EMAIL").expect("APPLICATION_EMAIL must be set!");
 
     initialize_eve_esi(application_name, application_email);
+
+    let _ = seed_auth_permissions(&db).await;
+    let _ = create_admin(&db).await;
 
     HttpServer::new(move || {
         let cors = Cors::default()
@@ -49,7 +53,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(DefaultHeaders::new().add(("Referrer-Policy", "no-referrer")))
             .wrap(
                 SessionMiddleware::builder(
-                    RedisActorSessionStore::new(redis_url.clone()),
+                    RedisActorSessionStore::new(valkey_url.clone()),
                     secret_key.clone(),
                 )
                 .build(),

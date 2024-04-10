@@ -1,9 +1,10 @@
 use actix_session::Session;
 use actix_web::{get, http::header, web, HttpResponse};
+use redis::Commands;
 use serde::Deserialize;
 use std::env;
 
-use crate::core::data::user::change_main;
+use crate::core::data::user::{change_main, set_user_as_admin};
 
 #[derive(Deserialize)]
 pub struct CallbackParams {
@@ -14,17 +15,44 @@ pub struct CallbackParams {
 #[derive(Deserialize)]
 pub struct QueryParams {
     set_main: Option<bool>,
+    admin_setup: Option<String>,
 }
 
 #[get("/login")]
 async fn login(session: Session, params: web::Query<QueryParams>) -> HttpResponse {
     let set_main = params.set_main.unwrap_or(false);
     let auth_data = crate::core::service::login::login();
+    let admin_code = &params.admin_setup;
 
     session.insert("state", &auth_data.state).unwrap();
 
     if set_main {
         session.insert("set_main", set_main).unwrap();
+    }
+
+    match admin_code {
+        Some(admin_code) => {
+            let valkey_url = env::var("VALKEY_URL").expect("VALKEY_URL must be set!");
+
+            let client = redis::Client::open(format!("redis://{}", valkey_url)).unwrap();
+            let mut con = client.get_connection().unwrap();
+
+            let admin_setup_code: Result<String, _> = con.get("admin_setup_code");
+
+            match admin_setup_code {
+                Ok(redis_admin_code) => {
+                    if &redis_admin_code != admin_code {
+                        return HttpResponse::Forbidden().body("Invalid admin authorization code, restart your application to get a new one.");
+                    }
+
+                    session.insert("set_as_admin", true).unwrap();
+                }
+                Err(_) => {
+                    return HttpResponse::Forbidden().body("Invalid admin authorization code, restart your application to get a new one.");
+                }
+            }
+        }
+        None => (),
     }
 
     HttpResponse::Found()
@@ -41,6 +69,7 @@ async fn callback(
 ) -> HttpResponse {
     let state: Option<String> = session.get("state").unwrap_or(None);
     let set_main: Option<bool> = session.get("set_main").unwrap_or(None);
+    let set_as_admin: Option<bool> = session.get("set_as_admin").unwrap_or(None);
 
     let frontend_domain = env::var("FRONTEND_DOMAIN").expect("FRONTEND_DOMAIN must be set!");
 
@@ -58,13 +87,37 @@ async fn callback(
     let ownership_entry =
         match crate::core::service::login::callback(&db, params.code.clone(), user).await {
             Ok(entry) => entry,
-            Err(error) => {
-                println!("{}", error);
-
+            Err(_) => {
                 return HttpResponse::InternalServerError()
                     .body("There was an issue logging you in, please try again.");
             }
         };
+
+    if let Some(true) = set_as_admin {
+        let valkey_url = env::var("VALKEY_URL").expect("VALKEY_URL must be set!");
+
+        let client = redis::Client::open(format!("redis://{}", valkey_url)).unwrap();
+        let mut con = client.get_connection().unwrap();
+
+        match set_user_as_admin(&db, ownership_entry.user_id).await {
+            Ok(user) => match user {
+                Some(_) => (),
+                None => {
+                    return HttpResponse::InternalServerError()
+                        .body("There was an issue logging you in, please try again.")
+                }
+            },
+            Err(_) => {
+                return HttpResponse::InternalServerError()
+                    .body("There was an issue logging you in, please try again.")
+            }
+        };
+
+        let _: () = redis::cmd("DEL")
+            .arg("admin_setup_code")
+            .query(&mut con)
+            .unwrap();
+    }
 
     let mut redirect_location = format!("http://{}/", frontend_domain);
 

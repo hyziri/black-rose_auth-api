@@ -32,6 +32,7 @@ pub async fn create_corporation(
                 corporation_id: ActiveValue::Set(corporation_id),
                 corporation_name: ActiveValue::Set(corporation.name),
                 alliance_id: ActiveValue::Set(corporation.alliance_id),
+                ceo: ActiveValue::set(corporation.ceo_id),
                 ..Default::default()
             };
 
