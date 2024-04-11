@@ -1,8 +1,13 @@
-use actix_session::Session;
-use actix_web::{get, http::header, web, HttpResponse};
+use axum::{
+    extract::Query,
+    http::StatusCode,
+    response::{IntoResponse, Redirect, Response},
+    Extension,
+};
 use redis::Commands;
 use serde::Deserialize;
 use std::env;
+use tower_sessions::Session;
 
 use crate::core::data::user::{change_main, set_user_as_admin};
 
@@ -13,21 +18,20 @@ pub struct CallbackParams {
 }
 
 #[derive(Deserialize)]
-pub struct QueryParams {
+pub struct LoginParams {
     set_main: Option<bool>,
     admin_setup: Option<String>,
 }
 
-#[get("/login")]
-async fn login(session: Session, params: web::Query<QueryParams>) -> HttpResponse {
-    let set_main = params.set_main.unwrap_or(false);
+pub async fn login(session: Session, params: Query<LoginParams>) -> Response {
+    let set_main = params.0.set_main.unwrap_or(false);
     let auth_data = crate::core::service::login::login();
-    let admin_code = &params.admin_setup;
+    let admin_code = &params.0.admin_setup;
 
-    session.insert("state", &auth_data.state).unwrap();
+    session.insert("state", &auth_data.state).await.unwrap();
 
     if set_main {
-        session.insert("set_main", set_main).unwrap();
+        session.insert("set_main", set_main).await.unwrap();
     }
 
     match admin_code {
@@ -42,54 +46,64 @@ async fn login(session: Session, params: web::Query<QueryParams>) -> HttpRespons
             match admin_setup_code {
                 Ok(redis_admin_code) => {
                     if &redis_admin_code != admin_code {
-                        return HttpResponse::Forbidden().body("Invalid admin authorization code, restart your application to get a new one.");
+                        return (
+                            StatusCode::FORBIDDEN,
+                            "Invalid admin authorization code, restart your application to get a new one.",
+                        )
+                            .into_response();
                     }
 
-                    session.insert("set_as_admin", true).unwrap();
+                    session.insert("set_as_admin", true).await.unwrap();
                 }
                 Err(_) => {
-                    return HttpResponse::Forbidden().body("Invalid admin authorization code, restart your application to get a new one.");
+                    return (
+                        StatusCode::FORBIDDEN,
+                        "Invalid admin authorization code, restart your application to get a new one.",
+                    )
+                        .into_response();
                 }
             }
         }
         None => (),
     }
 
-    HttpResponse::Found()
-        .append_header((header::LOCATION, auth_data.login_url))
-        .append_header((header::CACHE_CONTROL, "no-cache"))
-        .finish()
+    Redirect::temporary(&auth_data.login_url).into_response()
 }
 
-#[get("/callback")]
-async fn callback(
-    db: web::Data<sea_orm::DatabaseConnection>,
+pub async fn callback(
+    Extension(db): Extension<sea_orm::DatabaseConnection>,
     session: Session,
-    params: web::Query<CallbackParams>,
-) -> HttpResponse {
-    let state: Option<String> = session.get("state").unwrap_or(None);
-    let set_main: Option<bool> = session.get("set_main").unwrap_or(None);
-    let set_as_admin: Option<bool> = session.get("set_as_admin").unwrap_or(None);
+    params: Query<CallbackParams>,
+) -> Response {
+    let state: Option<String> = session.get("state").await.unwrap_or(None);
+    let set_main: Option<bool> = session.get("set_main").await.unwrap_or(None);
+    let set_as_admin: Option<bool> = session.get("set_as_admin").await.unwrap_or(None);
 
     let frontend_domain = env::var("FRONTEND_DOMAIN").expect("FRONTEND_DOMAIN must be set!");
 
     if state.is_none() || Some(params.state.clone()) != state {
-        return HttpResponse::BadRequest()
-            .body("There was an issue logging you in, please try again.");
+        return (
+            StatusCode::BAD_REQUEST,
+            "There was an issue logging you in, please try again.",
+        )
+            .into_response();
     }
 
-    session.remove("state");
-    session.remove("set_main");
+    let _ = session.remove::<String>("state").await;
+    let _ = session.remove::<bool>("set_main").await;
 
-    let user: Option<String> = session.get("user").unwrap_or(None);
+    let user: Option<String> = session.get("user").await.unwrap_or(None);
     let user: Option<i32> = user.map(|user| user.parse::<i32>().unwrap());
 
     let ownership_entry =
-        match crate::core::service::login::callback(&db, params.code.clone(), user).await {
+        match crate::core::service::login::callback(&db, params.0.code.clone(), user).await {
             Ok(entry) => entry,
             Err(_) => {
-                return HttpResponse::InternalServerError()
-                    .body("There was an issue logging you in, please try again.");
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "There was an issue logging you in, please try again.",
+                )
+                    .into_response();
             }
         };
 
@@ -103,13 +117,19 @@ async fn callback(
             Ok(user) => match user {
                 Some(_) => (),
                 None => {
-                    return HttpResponse::InternalServerError()
-                        .body("There was an issue logging you in, please try again.")
+                    return (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "There was an issue logging you in, please try again.",
+                    )
+                        .into_response();
                 }
             },
             Err(_) => {
-                return HttpResponse::InternalServerError()
-                    .body("There was an issue logging you in, please try again.")
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "There was an issue logging you in, please try again.",
+                )
+                    .into_response();
             }
         };
 
@@ -131,25 +151,18 @@ async fn callback(
 
     session
         .insert("user", format!("{}", ownership_entry.user_id))
+        .await
         .unwrap();
 
-    HttpResponse::PermanentRedirect()
-        .append_header((header::LOCATION, redirect_location))
-        .append_header((header::CACHE_CONTROL, "no-cache"))
-        .finish()
+    Redirect::permanent(&redirect_location).into_response()
 }
 
-#[get("/logout")]
-async fn logout(session: Session) -> HttpResponse {
-    session.clear();
+pub async fn logout(session: Session) -> Redirect {
+    session.clear().await;
 
     let frontend_domain = env::var("FRONTEND_DOMAIN").expect("FRONTEND_DOMAIN must be set!");
 
-    HttpResponse::PermanentRedirect()
-        .append_header((
-            header::LOCATION,
-            format!("http://{}/login", frontend_domain),
-        ))
-        .append_header((header::CACHE_CONTROL, "no-cache"))
-        .finish()
+    let redirect_location = format!("http://{}/login", frontend_domain);
+
+    Redirect::permanent(&redirect_location)
 }

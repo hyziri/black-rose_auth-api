@@ -1,28 +1,30 @@
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    Extension, Json,
+};
 use std::collections::HashSet;
-
-use actix_session::Session;
-use actix_web::{get, web, HttpResponse};
+use tower_sessions::Session;
 
 use crate::{
     core::{data::user::get_user_character_ownerships, model::user::UserDto},
     eve::data::character::{bulk_get_character_affiliations, get_character},
 };
 
-async fn get_user_id_from_session(session: Session) -> Result<i32, HttpResponse> {
-    let user: Option<String> = session.get("user").unwrap_or(None);
+async fn get_user_id_from_session(session: Session) -> Result<i32, Response> {
+    let user: Option<String> = session.get("user").await.unwrap_or(None);
     let user_id: Option<i32> = user.map(|user| user.parse::<i32>().unwrap());
 
     match user_id {
         Some(user_id) => Ok(user_id),
-        None => Err(HttpResponse::NotFound().body("User not found.")),
+        None => Err((StatusCode::NOT_FOUND, "User not found").into_response()),
     }
 }
 
-#[get("")]
 pub async fn get_user(
-    db: web::Data<sea_orm::DatabaseConnection>,
+    Extension(db): Extension<sea_orm::DatabaseConnection>,
     session: Session,
-) -> HttpResponse {
+) -> Response {
     let user_id = match get_user_id_from_session(session).await {
         Ok(user_id) => user_id,
         Err(response) => return response,
@@ -32,9 +34,15 @@ pub async fn get_user(
     {
         Ok(main_character) => match main_character {
             Some(main_character) => main_character,
-            None => return HttpResponse::NotFound().body("Main character not found."),
+            None => return (StatusCode::NOT_FOUND, "Main character not found.").into_response(),
         },
-        Err(_) => return HttpResponse::InternalServerError().body("Error getting user info."),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error getting user info.",
+            )
+                .into_response()
+        }
     };
 
     match get_character(&db, main_character.character_id).await {
@@ -46,19 +54,22 @@ pub async fn get_user(
                     character_name: character.character_name,
                 };
 
-                HttpResponse::Found().json(user_info)
+                (StatusCode::FOUND, Json(user_info)).into_response()
             }
-            None => HttpResponse::NotFound().body("Character info not found."),
+            None => (StatusCode::NOT_FOUND, "Character info not found.").into_response(),
         },
-        Err(_) => HttpResponse::InternalServerError().body("Error getting character info."),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Error getting character info.",
+        )
+            .into_response(),
     }
 }
 
-#[get("/main_character")]
 pub async fn get_user_main_character(
-    db: web::Data<sea_orm::DatabaseConnection>,
+    Extension(db): Extension<sea_orm::DatabaseConnection>,
     session: Session,
-) -> HttpResponse {
+) -> Response {
     let user_id = match get_user_id_from_session(session).await {
         Ok(user_id) => user_id,
         Err(response) => return response,
@@ -68,30 +79,37 @@ pub async fn get_user_main_character(
     {
         Ok(ownership) => match ownership {
             Some(ownership) => ownership,
-            None => return HttpResponse::NotFound().body("Main character not found."),
+            None => return (StatusCode::NOT_FOUND, "Main character not found.").into_response(),
         },
         Err(_) => {
-            return HttpResponse::InternalServerError().body("Error getting user's main character.")
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error getting user's main character.",
+            )
+                .into_response()
         }
     };
 
     match bulk_get_character_affiliations(&db, vec![main_character.character_id]).await {
         Ok(affiliation) => {
             if affiliation.is_empty() {
-                HttpResponse::NotFound().body("Character info not found.")
+                (StatusCode::NOT_FOUND, "Character info not found.").into_response()
             } else {
-                HttpResponse::Found().json(&affiliation[0])
+                (StatusCode::FOUND, Json(&affiliation[0])).into_response()
             }
         }
-        Err(_) => HttpResponse::InternalServerError().body("Error getting user info."),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Error getting user info.",
+        )
+            .into_response(),
     }
 }
 
-#[get("/characters")]
 pub async fn get_user_characters(
-    db: web::Data<sea_orm::DatabaseConnection>,
+    Extension(db): Extension<sea_orm::DatabaseConnection>,
     session: Session,
-) -> HttpResponse {
+) -> Response {
     let user_id = match get_user_id_from_session(session).await {
         Ok(user_id) => user_id,
         Err(response) => return response,
@@ -100,12 +118,16 @@ pub async fn get_user_characters(
     let characters = match get_user_character_ownerships(&db, user_id).await {
         Ok(characters) => characters,
         Err(_) => {
-            return HttpResponse::InternalServerError().body("Error getting user characters.")
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error getting user characters.",
+            )
+                .into_response();
         }
     };
 
     if characters.is_empty() {
-        return HttpResponse::NotFound().body("No characters found for user");
+        return (StatusCode::NOT_FOUND, "No characters found for user").into_response();
     }
 
     let character_ids: HashSet<i32> = characters
@@ -118,11 +140,15 @@ pub async fn get_user_characters(
     match bulk_get_character_affiliations(&db, unique_character_ids).await {
         Ok(character_affiliations) => {
             if character_affiliations.is_empty() {
-                HttpResponse::NotFound().body("No characters found for user.")
+                (StatusCode::NOT_FOUND, "No characters found for user").into_response()
             } else {
-                HttpResponse::Found().json(character_affiliations)
+                (StatusCode::FOUND, Json(character_affiliations)).into_response()
             }
         }
-        Err(_) => HttpResponse::InternalServerError().body("Error getting user info."),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Error getting user info.",
+        )
+            .into_response(),
     }
 }
