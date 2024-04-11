@@ -1,6 +1,8 @@
 use axum::{
+    extract::Query,
     http::StatusCode,
     response::{IntoResponse, Redirect, Response},
+    Extension,
 };
 use redis::Commands;
 use serde::Deserialize;
@@ -16,20 +18,20 @@ pub struct CallbackParams {
 }
 
 #[derive(Deserialize)]
-pub struct QueryParams {
+pub struct LoginParams {
     set_main: Option<bool>,
     admin_setup: Option<String>,
 }
 
-pub async fn login(session: Session, params: web::Query<QueryParams>) -> Response {
-    let set_main = params.set_main.unwrap_or(false);
+pub async fn login(session: Session, params: Query<LoginParams>) -> Response {
+    let set_main = params.0.set_main.unwrap_or(false);
     let auth_data = crate::core::service::login::login();
-    let admin_code = &params.admin_setup;
+    let admin_code = &params.0.admin_setup;
 
     session.insert("state", &auth_data.state).await.unwrap();
 
     if set_main {
-        session.insert("set_main", set_main).unwrap();
+        session.insert("set_main", set_main).await.unwrap();
     }
 
     match admin_code {
@@ -69,9 +71,9 @@ pub async fn login(session: Session, params: web::Query<QueryParams>) -> Respons
 }
 
 pub async fn callback(
-    db: web::Data<sea_orm::DatabaseConnection>,
+    Extension(db): Extension<sea_orm::DatabaseConnection>,
     session: Session,
-    params: web::Query<CallbackParams>,
+    params: Query<CallbackParams>,
 ) -> Response {
     let state: Option<String> = session.get("state").await.unwrap_or(None);
     let set_main: Option<bool> = session.get("set_main").await.unwrap_or(None);
@@ -87,14 +89,14 @@ pub async fn callback(
             .into_response();
     }
 
-    session.remove("state");
-    session.remove("set_main");
+    let _ = session.remove::<String>("state").await;
+    let _ = session.remove::<bool>("set_main").await;
 
     let user: Option<String> = session.get("user").await.unwrap_or(None);
     let user: Option<i32> = user.map(|user| user.parse::<i32>().unwrap());
 
     let ownership_entry =
-        match crate::core::service::login::callback(&db, params.code.clone(), user).await {
+        match crate::core::service::login::callback(&db, params.0.code.clone(), user).await {
             Ok(entry) => entry,
             Err(_) => {
                 return (
@@ -156,7 +158,7 @@ pub async fn callback(
 }
 
 pub async fn logout(session: Session) -> Redirect {
-    session.clear();
+    session.clear().await;
 
     let frontend_domain = env::var("FRONTEND_DOMAIN").expect("FRONTEND_DOMAIN must be set!");
 
