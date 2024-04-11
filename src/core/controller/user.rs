@@ -1,8 +1,5 @@
 use std::collections::HashSet;
 
-use actix_session::Session;
-use actix_web::{get, web, HttpResponse};
-
 use crate::{
     core::{data::user::get_user_character_ownerships, model::user::UserDto},
     eve::data::character::{bulk_get_character_affiliations, get_character},
@@ -18,7 +15,6 @@ async fn get_user_id_from_session(session: Session) -> Result<i32, HttpResponse>
     }
 }
 
-#[get("")]
 pub async fn get_user(
     db: web::Data<sea_orm::DatabaseConnection>,
     session: Session,
@@ -54,7 +50,6 @@ pub async fn get_user(
     }
 }
 
-#[get("/main_character")]
 pub async fn get_user_main_character(
     db: web::Data<sea_orm::DatabaseConnection>,
     session: Session,
@@ -87,7 +82,6 @@ pub async fn get_user_main_character(
     }
 }
 
-#[get("/characters")]
 pub async fn get_user_characters(
     db: web::Data<sea_orm::DatabaseConnection>,
     session: Session,

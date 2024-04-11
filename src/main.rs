@@ -1,23 +1,22 @@
 mod core;
 mod eve;
+mod router;
 
 use sea_orm::{Database, DatabaseConnection};
 
-use actix_cors::Cors;
-use actix_session::{storage::RedisActorSessionStore, SessionMiddleware};
-use actix_web::cookie::Key;
-use actix_web::middleware::DefaultHeaders;
-use actix_web::web::Data;
-use actix_web::{App, HttpServer};
-use core::routes::user_service;
+use axum::{
+    routing::{get, post},
+    Router,
+};
 use core::seed::{create_admin, seed_auth_permissions};
 use eve_esi::initialize_eve_esi;
 use std::env;
+use time::Duration;
+use tower_sessions::{cookie::SameSite, Expiry, MemoryStore, Session, SessionManagerLayer};
+use tower_sessions_redis_store::{fred::prelude::*, RedisStore};
 
-use crate::core::routes::auth_service;
-
-#[actix_web::main]
-async fn main() -> std::io::Result<()> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv::dotenv().ok();
 
     let database_string = env::var("DATABASE_URL").expect("DATABASE_URL must be set!");
@@ -30,39 +29,35 @@ async fn main() -> std::io::Result<()> {
         env::var("APPLICATION_MASTER_KEY").expect("APPLICATION_MASTER_KEY must be set!");
     let valkey_url = env::var("VALKEY_URL").expect("VALKEY_URL must be set!");
 
-    let secret_key = Key::derive_from(application_master_key.as_bytes());
-
     let application_name = env::var("APPLICATION_NAME").expect("APPLICATION_NAME must be set!");
     let application_email = env::var("APPLICATION_EMAIL").expect("APPLICATION_EMAIL must be set!");
+
+    let pool = RedisPool::new(RedisConfig::default(), None, None, None, 6)?;
+
+    let redis_conn = pool.connect();
+    pool.wait_for_connect().await?;
+
+    let session_store = RedisStore::new(pool);
+    let session_layer = SessionManagerLayer::new(session_store)
+        .with_secure(false)
+        .with_same_site(SameSite::Lax)
+        .with_expiry(Expiry::OnInactivity(Duration::seconds(120)));
 
     initialize_eve_esi(application_name, application_email);
 
     let _ = seed_auth_permissions(&db).await;
     let _ = create_admin(&db).await;
 
-    HttpServer::new(move || {
-        let cors = Cors::default()
-            .allowed_origin(&format!("http://{}", frontend_domain))
-            .allow_any_header()
-            .allow_any_method()
-            .supports_credentials()
-            .max_age(3600);
+    let app = router::routes().layer(session_layer);
 
-        App::new()
-            .wrap(cors)
-            .wrap(DefaultHeaders::new().add(("Referrer-Policy", "no-referrer")))
-            .wrap(
-                SessionMiddleware::builder(
-                    RedisActorSessionStore::new(valkey_url.clone()),
-                    secret_key.clone(),
-                )
-                .build(),
-            )
-            .app_data(Data::new(db.clone()))
-            .service(auth_service())
-            .service(user_service())
-    })
-    .bind(format!("0.0.0.0:{}", application_port))?
-    .run()
-    .await
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:8080")
+        .await
+        .unwrap();
+
+    println!("Now listening on {}", "127.0.0.1:8080");
+    axum::serve(listener, app).await.unwrap();
+
+    redis_conn.await??;
+
+    Ok(())
 }
