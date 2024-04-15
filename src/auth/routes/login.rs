@@ -2,14 +2,15 @@ use axum::{
     extract::Query,
     http::StatusCode,
     response::{IntoResponse, Redirect, Response},
-    Extension,
+    routing::get,
+    Extension, Router,
 };
 use redis::Commands;
 use serde::Deserialize;
 use std::env;
 use tower_sessions::Session;
 
-use crate::core::data::user::{change_main, set_user_as_admin};
+use crate::auth::data::user::{change_main, set_user_as_admin};
 
 #[derive(Deserialize)]
 pub struct CallbackParams {
@@ -23,9 +24,16 @@ pub struct LoginParams {
     admin_setup: Option<String>,
 }
 
+pub fn login_routes() -> Router {
+    Router::new()
+        .route("/login", get(login))
+        .route("/callback", get(callback))
+        .route("/logout", get(logout))
+}
+
 pub async fn login(session: Session, params: Query<LoginParams>) -> Response {
     let set_main = params.0.set_main.unwrap_or(false);
-    let auth_data = crate::core::service::login::login();
+    let auth_data = crate::auth::service::login::login();
     let admin_code = &params.0.admin_setup;
 
     session.insert("state", &auth_data.state).await.unwrap();
@@ -96,7 +104,7 @@ pub async fn callback(
     let user: Option<i32> = user.map(|user| user.parse::<i32>().unwrap());
 
     let ownership_entry =
-        match crate::core::service::login::callback(&db, params.0.code.clone(), user).await {
+        match crate::auth::service::login::callback(&db, params.0.code.clone(), user).await {
             Ok(entry) => entry,
             Err(_) => {
                 return (

@@ -3,7 +3,7 @@ use redis::Commands;
 use sea_orm::DatabaseConnection;
 use std::env;
 
-use crate::core::data::user::get_users_with_admin;
+use crate::auth::data::user::get_users_with_admin;
 
 pub async fn seed_auth_permissions(db: &DatabaseConnection) -> Result<(), sea_orm::DbErr> {
     let module_name = "Auth".to_string();

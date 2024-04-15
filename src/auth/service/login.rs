@@ -6,7 +6,7 @@ use std::env;
 
 use entity::auth_user_character_ownership::Model as CharacterOwnership;
 
-use crate::core::data::user::{
+use crate::auth::data::user::{
     create_user, get_user_character_ownership_by_ownerhash, update_ownership,
 };
 use crate::eve::data::character::create_character;

@@ -1,11 +1,11 @@
-mod core;
+mod auth;
 mod eve;
 mod router;
 
 use sea_orm::{Database, DatabaseConnection};
 
+use auth::seed::{create_admin, seed_auth_permissions};
 use axum::Extension;
-use core::seed::{create_admin, seed_auth_permissions};
 use eve_esi::initialize_eve_esi;
 use std::env;
 use time::Duration;

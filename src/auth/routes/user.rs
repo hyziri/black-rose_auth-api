@@ -1,15 +1,23 @@
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
-    Extension, Json,
+    routing::get,
+    Extension, Json, Router,
 };
 use std::collections::HashSet;
 use tower_sessions::Session;
 
 use crate::{
-    core::{data::user::get_user_character_ownerships, model::user::UserDto},
+    auth::{data::user::get_user_character_ownerships, model::user::UserDto},
     eve::data::character::{bulk_get_character_affiliations, get_character},
 };
+
+pub fn user_routes() -> Router {
+    Router::new()
+        .route("/", get(get_user))
+        .route("/main", get(get_user_main_character))
+        .route("/characters", get(get_user_characters))
+}
 
 async fn get_user_id_from_session(session: Session) -> Result<i32, Response> {
     let user: Option<String> = session.get("user").await.unwrap_or(None);
@@ -30,7 +38,7 @@ pub async fn get_user(
         Err(response) => return response,
     };
 
-    let main_character = match crate::core::data::user::get_user_main_character(&db, user_id).await
+    let main_character = match crate::auth::data::user::get_user_main_character(&db, user_id).await
     {
         Ok(main_character) => match main_character {
             Some(main_character) => main_character,
@@ -75,7 +83,7 @@ pub async fn get_user_main_character(
         Err(response) => return response,
     };
 
-    let main_character = match crate::core::data::user::get_user_main_character(&db, user_id).await
+    let main_character = match crate::auth::data::user::get_user_main_character(&db, user_id).await
     {
         Ok(ownership) => match ownership {
             Some(ownership) => ownership,

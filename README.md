@@ -1,4 +1,4 @@
-# Black Rose Moons API
+# Black Rose Auth API
 
 ## Development
 
