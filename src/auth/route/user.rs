@@ -29,6 +29,15 @@ async fn get_user_id_from_session(session: Session) -> Result<i32, Response> {
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/user",
+    responses(
+        (status = 200, description = "Current user info", body = UserDto),
+        (status = 404, description = "User not found", body = String),
+        (status = 500, description = "Internal server error", body = String)
+    )
+)]
 pub async fn get_user(
     Extension(db): Extension<sea_orm::DatabaseConnection>,
     session: Session,
@@ -74,6 +83,15 @@ pub async fn get_user(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/user/main",
+    responses(
+        (status = 200, description = "Returns user's main character info", body = CharacterAffiliationDto),
+        (status = 404, description = "User not found", body = String),
+        (status = 500, description = "Internal server error", body = String)
+    )
+)]
 pub async fn get_user_main_character(
     Extension(db): Extension<sea_orm::DatabaseConnection>,
     session: Session,
@@ -114,6 +132,15 @@ pub async fn get_user_main_character(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/user/characters",
+    responses(
+        (status = 200, description = "Returns list of all user characters", body = [CharacterAffiliationDto]),
+        (status = 404, description = "User not found", body = String),
+        (status = 500, description = "Internal server error", body = String)
+    )
+)]
 pub async fn get_user_characters(
     Extension(db): Extension<sea_orm::DatabaseConnection>,
     session: Session,

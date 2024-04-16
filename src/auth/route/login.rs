@@ -41,6 +41,14 @@ pub fn login_routes() -> Router {
         .route("/logout", get(logout))
 }
 
+#[utoipa::path(
+    get,
+    path = "/auth/login",
+    responses(
+        (status = 307, description = "Redirect to EVE Online login page"),
+        (status = 403, description = "Forbidden", body = String)
+    )
+)]
 pub async fn login(session: Session, params: Query<LoginParams>) -> Response {
     let set_main = params.0.set_main.unwrap_or(false);
     let admin_code = &params.0.admin_setup;
@@ -223,6 +231,13 @@ pub async fn callback(
     Redirect::permanent(&redirect_location).into_response()
 }
 
+#[utoipa::path(
+    get,
+    path = "/auth/logout",
+    responses(
+        (status = 308, description = "Redirect to frontend login page")
+    )
+)]
 pub async fn logout(session: Session) -> Redirect {
     session.clear().await;
 
