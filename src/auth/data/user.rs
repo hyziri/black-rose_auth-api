@@ -33,7 +33,6 @@ pub async fn get_user_main_character(
     }
 }
 
-/// Updates user ownership, creates it if it does not exist
 pub async fn update_ownership(
     db: &DatabaseConnection,
     user_id: i32,
