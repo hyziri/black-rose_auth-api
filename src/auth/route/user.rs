@@ -6,6 +6,7 @@ use axum::{
 };
 use std::collections::HashSet;
 use tower_sessions::Session;
+use utoipa::openapi::security::SecurityRequirement;
 
 use crate::{
     auth::{data::user::get_user_character_ownerships, model::user::UserDto},
@@ -36,6 +37,9 @@ async fn get_user_id_from_session(session: Session) -> Result<i32, Response> {
         (status = 200, description = "Current user info", body = UserDto),
         (status = 404, description = "User not found", body = String),
         (status = 500, description = "Internal server error", body = String)
+    ),
+    security(
+        ("login" = [])
     )
 )]
 pub async fn get_user(
@@ -90,6 +94,9 @@ pub async fn get_user(
         (status = 200, description = "Returns user's main character info", body = CharacterAffiliationDto),
         (status = 404, description = "User not found", body = String),
         (status = 500, description = "Internal server error", body = String)
+    ),
+    security(
+        ("login" = [])
     )
 )]
 pub async fn get_user_main_character(
@@ -139,6 +146,9 @@ pub async fn get_user_main_character(
         (status = 200, description = "Returns list of all user characters", body = [CharacterAffiliationDto]),
         (status = 404, description = "User not found", body = String),
         (status = 500, description = "Internal server error", body = String)
+    ),
+    security(
+        ("login" = [])
     )
 )]
 pub async fn get_user_characters(
