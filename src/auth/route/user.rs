@@ -71,7 +71,7 @@ pub async fn get_user(
                     character_name: character.character_name,
                 };
 
-                (StatusCode::FOUND, Json(user_info)).into_response()
+                (StatusCode::OK, Json(user_info)).into_response()
             }
             None => (StatusCode::NOT_FOUND, "Character info not found.").into_response(),
         },
@@ -121,7 +121,7 @@ pub async fn get_user_main_character(
             if affiliation.is_empty() {
                 (StatusCode::NOT_FOUND, "Character info not found.").into_response()
             } else {
-                (StatusCode::FOUND, Json(&affiliation[0])).into_response()
+                (StatusCode::OK, Json(&affiliation[0])).into_response()
             }
         }
         Err(_) => (
@@ -177,7 +177,7 @@ pub async fn get_user_characters(
             if character_affiliations.is_empty() {
                 (StatusCode::NOT_FOUND, "No characters found for user").into_response()
             } else {
-                (StatusCode::FOUND, Json(character_affiliations)).into_response()
+                (StatusCode::OK, Json(character_affiliations)).into_response()
             }
         }
         Err(_) => (

@@ -34,7 +34,7 @@ pub struct LoginParams {
     admin_setup: Option<String>,
 }
 
-pub fn login_routes() -> Router {
+pub fn auth_routes() -> Router {
     Router::new()
         .route("/login", get(login))
         .route("/callback", get(callback))
@@ -235,7 +235,7 @@ pub async fn callback(
     get,
     path = "/auth/logout",
     responses(
-        (status = 308, description = "Redirect to frontend login page")
+        (status = 307, description = "Redirect to front end login page")
     )
 )]
 pub async fn logout(session: Session) -> Redirect {
