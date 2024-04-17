@@ -2,7 +2,7 @@ use axum::{
     extract::Query,
     http::StatusCode,
     response::{IntoResponse, Redirect, Response},
-    routing::get,
+    routing::post,
     Extension, Router,
 };
 use chrono::{Duration, Utc};
@@ -36,13 +36,13 @@ pub struct LoginParams {
 
 pub fn auth_routes() -> Router {
     Router::new()
-        .route("/login", get(login))
-        .route("/callback", get(callback))
-        .route("/logout", get(logout))
+        .route("/login", post(login))
+        .route("/callback", post(callback))
+        .route("/logout", post(logout))
 }
 
 #[utoipa::path(
-    get,
+    post,
     path = "/auth/login",
     responses(
         (status = 307, description = "Redirect to EVE Online login page"),
@@ -232,7 +232,7 @@ pub async fn callback(
 }
 
 #[utoipa::path(
-    get,
+    post,
     path = "/auth/logout",
     responses(
         (status = 307, description = "Redirect to front end login page")
