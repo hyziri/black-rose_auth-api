@@ -18,8 +18,10 @@ pub fn routes() -> Router {
             user::get_user,
             user::get_user_main_character,
             user::get_user_characters,
+            group::create_group,
+            group::get_group_by_id,
             group::get_groups,
-            group::create_group
+            group::delete_group
         ),
         components(schemas(UserDto, NewGroupDto, GroupType, CharacterAffiliationDto, GroupDto)),
         tags(
@@ -35,7 +37,7 @@ pub fn routes() -> Router {
     let routes = Router::new()
         .nest("/auth", auth_routes())
         .nest("/user", user_routes())
-        .nest("/groups", group_routes());
+        .nest("/group", group_routes());
 
     if cfg!(debug_assertions) {
         routes.merge(SwaggerUi::new("/docs").url("/openapi.json", ApiDoc::openapi()))

@@ -1,4 +1,7 @@
-use sea_orm::{ActiveModelTrait, ActiveValue::Set, DatabaseConnection, DbErr, EntityTrait};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
+    QueryFilter,
+};
 
 use crate::auth::model::group::NewGroupDto;
 
@@ -20,4 +23,26 @@ pub async fn create_group(db: &DatabaseConnection, new_group: NewGroupDto) -> Re
 
 pub async fn get_groups(db: &DatabaseConnection) -> Result<Vec<Group>, DbErr> {
     entity::prelude::AuthGroup::find().all(db).await
+}
+
+pub async fn get_group_by_id(db: &DatabaseConnection, id: i32) -> Result<Option<Group>, DbErr> {
+    entity::prelude::AuthGroup::find()
+        .filter(entity::auth_group::Column::Id.eq(id))
+        .one(db)
+        .await
+}
+
+pub async fn delete_group(db: &DatabaseConnection, id: i32) -> Result<Option<i32>, DbErr> {
+    let group = entity::auth_group::ActiveModel {
+        id: Set(id),
+        ..Default::default()
+    };
+
+    let result = entity::prelude::AuthGroup::delete(group).exec(db).await?;
+
+    if result.rows_affected == 1 {
+        Ok(Some(id))
+    } else {
+        Ok(None)
+    }
 }

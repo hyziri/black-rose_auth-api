@@ -1,5 +1,7 @@
+use axum::extract::Path;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
+use axum::routing::delete;
 use axum::Json;
 use axum::{
     extract,
@@ -15,8 +17,10 @@ use crate::auth::model::group::{GroupDto, NewGroupDto};
 
 pub fn group_routes() -> Router {
     Router::new()
-        .route("/", get(get_groups))
+        .route("/:id", get(get_group_by_id))
+        .route("/list", get(get_groups))
         .route("/create", post(create_group))
+        .route("/delete/:id", delete(delete_group))
 }
 
 async fn require_permissions(db: &DatabaseConnection, session: Session) -> Result<(), Response> {
@@ -51,7 +55,7 @@ async fn require_permissions(db: &DatabaseConnection, session: Session) -> Resul
 
 #[utoipa::path(
     post,
-    path = "/groups/create",
+    path = "/group/create",
     responses(
         (status = 200, description = "Group created successfully"),
         (status = 403, description = "Insufficient permissions"),
@@ -91,7 +95,7 @@ pub async fn create_group(
 
 #[utoipa::path(
     get,
-    path = "/groups",
+    path = "/group",
     responses(
         (status = 200, description = "Returns a list of groups"),
         (status = 403, description = "Insufficient permissions"),
@@ -117,6 +121,74 @@ pub async fn get_groups(
 
             (StatusCode::OK, Json(dto)).into_response()
         }
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error getting groups").into_response(),
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/group/{id}",
+    responses(
+        (status = 200, description = "Returns group info"),
+        (status = 403, description = "Insufficient permissions"),
+        (status = 404, description = "Not found", body = String),
+        (status = 500, description = "Internal server error", body = String)
+    ),
+    security(
+        ("login" = [])
+    )
+)]
+pub async fn get_group_by_id(
+    Extension(db): Extension<DatabaseConnection>,
+    session: Session,
+    Path(id): Path<(i32,)>,
+) -> Response {
+    match require_permissions(&db, session).await {
+        Ok(_) => (),
+        Err(response) => return response,
+    };
+
+    match data::group::get_group_by_id(&db, id.0).await {
+        Ok(group) => match group {
+            Some(group) => {
+                let dto: GroupDto = group.into();
+
+                (StatusCode::OK, Json(dto)).into_response()
+            }
+            None => (StatusCode::NOT_FOUND, "Group not found").into_response(),
+        },
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error getting groups").into_response(),
+    }
+}
+
+#[utoipa::path(
+    delete,
+    path = "/group/delete/{id}",
+    responses(
+        (status = 200, description = "Group deleted successfully"),
+        (status = 403, description = "Insufficient permissions"),
+        (status = 404, description = "Not found", body = String),
+        (status = 500, description = "Internal server error", body = String)
+    ),
+    security(
+        ("login" = [])
+    )
+)]
+pub async fn delete_group(
+    Extension(db): Extension<DatabaseConnection>,
+    session: Session,
+    Path(id): Path<(i32,)>,
+) -> Response {
+    match require_permissions(&db, session).await {
+        Ok(_) => (),
+        Err(response) => return response,
+    };
+
+    match data::group::delete_group(&db, id.0).await {
+        Ok(result) => match result {
+            Some(id) => (StatusCode::OK, Json(id)).into_response(),
+            None => (StatusCode::NOT_FOUND, "Group not found").into_response(),
+        },
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error getting groups").into_response(),
     }
 }
