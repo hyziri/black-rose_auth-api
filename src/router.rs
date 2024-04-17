@@ -2,9 +2,11 @@ use axum::Router;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-use crate::auth::model::user::UserDto;
-use crate::auth::route::auth;
-use crate::auth::route::user;
+use crate::auth::model::{
+    group::{GroupType, NewGroupDto},
+    user::UserDto,
+};
+use crate::auth::route::{auth, group, user};
 use crate::eve::model::character::CharacterAffiliationDto;
 
 pub fn routes() -> Router {
@@ -15,9 +17,10 @@ pub fn routes() -> Router {
             auth::logout,
             user::get_user,
             user::get_user_main_character,
-            user::get_user_characters
+            user::get_user_characters,
+            group::create_group
         ),
-        components(schemas(UserDto, CharacterAffiliationDto)),
+        components(schemas(UserDto, NewGroupDto, GroupType, CharacterAffiliationDto)),
         tags(
             (name = "Black Rose Auth API", description = "Black Rose Auth API endpoints")
         )

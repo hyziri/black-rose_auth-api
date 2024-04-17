@@ -1,3 +1,4 @@
+use sea_orm::DbErr;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
 };
@@ -5,7 +6,7 @@ use sea_orm::{
 use entity::auth_user::Model as User;
 use entity::auth_user_character_ownership::Model as UserCharacterOwnership;
 
-pub async fn create_user(db: &DatabaseConnection) -> Result<i32, sea_orm::DbErr> {
+pub async fn create_user(db: &DatabaseConnection) -> Result<i32, DbErr> {
     let user = entity::auth_user::ActiveModel {
         ..Default::default()
     };
@@ -15,10 +16,17 @@ pub async fn create_user(db: &DatabaseConnection) -> Result<i32, sea_orm::DbErr>
     Ok(user.id)
 }
 
+pub async fn get_user(db: &DatabaseConnection, user_id: i32) -> Result<Option<User>, DbErr> {
+    entity::prelude::AuthUser::find()
+        .filter(entity::auth_user::Column::Id.eq(user_id))
+        .one(db)
+        .await
+}
+
 pub async fn get_user_main_character(
     db: &DatabaseConnection,
     user_id: i32,
-) -> Result<Option<UserCharacterOwnership>, sea_orm::DbErr> {
+) -> Result<Option<UserCharacterOwnership>, DbErr> {
     let characters = get_user_character_ownerships(db, user_id).await?;
 
     if characters.is_empty() {
@@ -38,8 +46,8 @@ pub async fn update_ownership(
     user_id: i32,
     character_id: i32,
     ownerhash: String,
-) -> Result<UserCharacterOwnership, sea_orm::DbErr> {
-    let existing_ownership = character_ownership(db, character_id).await?;
+) -> Result<UserCharacterOwnership, DbErr> {
+    let existing_ownership = get_character_ownership(db, character_id).await?;
 
     match existing_ownership {
         Some(existing_ownership) => {
@@ -92,16 +100,15 @@ pub async fn update_ownership(
     }
 }
 
-pub async fn character_ownership(
+pub async fn get_character_ownership(
     db: &DatabaseConnection,
     character_id: i32,
-) -> Result<Option<UserCharacterOwnership>, sea_orm::DbErr> {
+) -> Result<Option<UserCharacterOwnership>, DbErr> {
     let ownership: Option<UserCharacterOwnership> =
         entity::prelude::AuthUserCharacterOwnership::find()
             .filter(entity::auth_user_character_ownership::Column::CharacterId.eq(character_id))
             .one(db)
-            .await
-            .unwrap();
+            .await?;
 
     Ok(ownership)
 }
@@ -109,44 +116,35 @@ pub async fn character_ownership(
 pub async fn get_user_character_ownerships(
     db: &DatabaseConnection,
     user_id: i32,
-) -> Result<Vec<UserCharacterOwnership>, sea_orm::DbErr> {
-    let ownerships: Vec<UserCharacterOwnership> =
-        entity::prelude::AuthUserCharacterOwnership::find()
-            .filter(entity::auth_user_character_ownership::Column::UserId.eq(user_id))
-            .all(db)
-            .await
-            .unwrap();
-
-    Ok(ownerships)
+) -> Result<Vec<UserCharacterOwnership>, DbErr> {
+    entity::prelude::AuthUserCharacterOwnership::find()
+        .filter(entity::auth_user_character_ownership::Column::UserId.eq(user_id))
+        .all(db)
+        .await
 }
 
 pub async fn get_user_character_ownership_by_ownerhash(
     db: &DatabaseConnection,
     ownerhash: String,
-) -> Result<Option<UserCharacterOwnership>, sea_orm::DbErr> {
-    let ownership: Option<UserCharacterOwnership> =
-        entity::prelude::AuthUserCharacterOwnership::find()
-            .filter(entity::auth_user_character_ownership::Column::Ownerhash.eq(ownerhash))
-            .one(db)
-            .await
-            .unwrap();
-
-    Ok(ownership)
+) -> Result<Option<UserCharacterOwnership>, DbErr> {
+    entity::prelude::AuthUserCharacterOwnership::find()
+        .filter(entity::auth_user_character_ownership::Column::Ownerhash.eq(ownerhash))
+        .one(db)
+        .await
 }
 
-pub async fn change_main(
+pub async fn update_user_main(
     db: &DatabaseConnection,
     character_id: i32,
-) -> Result<Option<UserCharacterOwnership>, sea_orm::DbErr> {
-    let get_new_main = character_ownership(db, character_id).await?;
+) -> Result<Option<UserCharacterOwnership>, DbErr> {
+    let get_new_main = get_character_ownership(db, character_id).await?;
 
     if let Some(new_main) = get_new_main {
         let get_old_main = entity::prelude::AuthUserCharacterOwnership::find()
             .filter(entity::auth_user_character_ownership::Column::UserId.eq(new_main.user_id))
             .filter(entity::auth_user_character_ownership::Column::Main.eq(true))
             .one(db)
-            .await
-            .unwrap();
+            .await?;
 
         let mut new_main: entity::auth_user_character_ownership::ActiveModel = new_main.into();
         new_main.main = Set(true);
@@ -169,10 +167,10 @@ pub async fn change_main(
     Ok(None)
 }
 
-pub async fn set_user_as_admin(
+pub async fn update_user_as_admin(
     db: &DatabaseConnection,
     user_id: i32,
-) -> Result<Option<User>, sea_orm::DbErr> {
+) -> Result<Option<User>, DbErr> {
     let user = entity::prelude::AuthUser::find_by_id(user_id)
         .one(db)
         .await?;
@@ -191,7 +189,7 @@ pub async fn set_user_as_admin(
     }
 }
 
-pub async fn get_users_with_admin(db: &DatabaseConnection) -> Result<Vec<User>, sea_orm::DbErr> {
+pub async fn get_users_with_admin(db: &DatabaseConnection) -> Result<Vec<User>, DbErr> {
     entity::prelude::AuthUser::find()
         .filter(entity::auth_user::Column::Admin.eq(true))
         .all(db)

@@ -2,7 +2,7 @@ use axum::{
     extract::Query,
     http::StatusCode,
     response::{IntoResponse, Redirect, Response},
-    routing::post,
+    routing::get,
     Extension, Router,
 };
 use chrono::{Duration, Utc};
@@ -14,10 +14,10 @@ use serde::Deserialize;
 use std::env;
 use tower_sessions::Session;
 
-use crate::auth::data::user::{change_main, set_user_as_admin};
 use crate::auth::data::user::{
     create_user, get_user_character_ownership_by_ownerhash, update_ownership,
 };
+use crate::auth::data::user::{update_user_as_admin, update_user_main};
 use crate::eve::data::character::create_character;
 use crate::eve::data::character::update_affiliation;
 use entity::auth_user_character_ownership::Model as CharacterOwnership;
@@ -36,13 +36,13 @@ pub struct LoginParams {
 
 pub fn auth_routes() -> Router {
     Router::new()
-        .route("/login", post(login))
-        .route("/callback", post(callback))
-        .route("/logout", post(logout))
+        .route("/login", get(login))
+        .route("/callback", get(callback))
+        .route("/logout", get(logout))
 }
 
 #[utoipa::path(
-    post,
+    get,
     path = "/auth/login",
     responses(
         (status = 307, description = "Redirect to EVE Online login page"),
@@ -187,7 +187,7 @@ pub async fn callback(
         let client = redis::Client::open(format!("redis://{}", valkey_url)).unwrap();
         let mut con = client.get_connection().unwrap();
 
-        match set_user_as_admin(&db, ownership_entry.user_id).await {
+        match update_user_as_admin(&db, ownership_entry.user_id).await {
             Ok(user) => match user {
                 Some(_) => (),
                 None => {
@@ -217,7 +217,7 @@ pub async fn callback(
 
     if let Some(true) = set_main {
         if !ownership_entry.main {
-            let _ = change_main(&db, ownership_entry.character_id).await;
+            let _ = update_user_main(&db, ownership_entry.character_id).await;
 
             redirect_location = format!("http://{}/settings", frontend_domain)
         };
@@ -232,7 +232,7 @@ pub async fn callback(
 }
 
 #[utoipa::path(
-    post,
+    get,
     path = "/auth/logout",
     responses(
         (status = 307, description = "Redirect to front end login page")

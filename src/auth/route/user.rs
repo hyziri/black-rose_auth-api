@@ -6,7 +6,6 @@ use axum::{
 };
 use std::collections::HashSet;
 use tower_sessions::Session;
-use utoipa::openapi::security::SecurityRequirement;
 
 use crate::{
     auth::{data::user::get_user_character_ownerships, model::user::UserDto},

@@ -46,6 +46,7 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(ColumnDef::new(AuthGroup::Name).string().not_null())
+                    .col(ColumnDef::new(AuthGroup::Description).text())
                     .col(
                         ColumnDef::new(AuthGroup::Confidential)
                             .boolean()
@@ -432,6 +433,7 @@ enum AuthGroup {
     Table,
     Id,
     Name,
+    Description,
     Confidential, // Whether or not members are hidden
     GroupType,    // Open, Auto, Apply, Hidden
     FilterType,   // All, Any
