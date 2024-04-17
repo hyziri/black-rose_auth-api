@@ -3,7 +3,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::auth::model::{
-    group::{GroupType, NewGroupDto},
+    group::{GroupDto, GroupType, NewGroupDto},
     user::UserDto,
 };
 use crate::auth::route::{auth, group, user};
@@ -18,9 +18,10 @@ pub fn routes() -> Router {
             user::get_user,
             user::get_user_main_character,
             user::get_user_characters,
+            group::get_groups,
             group::create_group
         ),
-        components(schemas(UserDto, NewGroupDto, GroupType, CharacterAffiliationDto)),
+        components(schemas(UserDto, NewGroupDto, GroupType, CharacterAffiliationDto, GroupDto)),
         tags(
             (name = "Black Rose Auth API", description = "Black Rose Auth API endpoints")
         )
@@ -34,7 +35,7 @@ pub fn routes() -> Router {
     let routes = Router::new()
         .nest("/auth", auth_routes())
         .nest("/user", user_routes())
-        .nest("/group", group_routes());
+        .nest("/groups", group_routes());
 
     if cfg!(debug_assertions) {
         routes.merge(SwaggerUi::new("/docs").url("/openapi.json", ApiDoc::openapi()))

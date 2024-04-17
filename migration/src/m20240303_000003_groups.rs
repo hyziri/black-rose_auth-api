@@ -72,7 +72,8 @@ impl MigrationTrait for Migration {
                                 Alias::new("group_filter_type"),
                                 [Alias::new("All"), Alias::new("Any")],
                             )
-                            .not_null(),
+                            .not_null()
+                            .default("All"),
                     )
                     .to_owned(),
             )

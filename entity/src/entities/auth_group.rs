@@ -11,6 +11,8 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
     pub name: String,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub description: Option<String>,
     pub confidential: bool,
     pub group_type: GroupType,
     pub filter_type: GroupFilterType,

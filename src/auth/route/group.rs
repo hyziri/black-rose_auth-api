@@ -1,14 +1,22 @@
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::{extract, response::Response, routing::post, Extension, Router};
+use axum::Json;
+use axum::{
+    extract,
+    response::Response,
+    routing::{get, post},
+    Extension, Router,
+};
 use sea_orm::DatabaseConnection;
 use tower_sessions::Session;
 
-use crate::auth::data::user::get_user;
-use crate::auth::model::group::NewGroupDto;
+use crate::auth::data;
+use crate::auth::model::group::{GroupDto, NewGroupDto};
 
 pub fn group_routes() -> Router {
-    Router::new().route("/create", post(create_group))
+    Router::new()
+        .route("/", get(get_groups))
+        .route("/create", post(create_group))
 }
 
 async fn require_permissions(db: &DatabaseConnection, session: Session) -> Result<(), Response> {
@@ -20,7 +28,7 @@ async fn require_permissions(db: &DatabaseConnection, session: Session) -> Resul
         None => return Err((StatusCode::NOT_FOUND, "User not found").into_response()),
     };
 
-    match get_user(db, user_id).await {
+    match data::user::get_user(db, user_id).await {
         Ok(user) => match user {
             Some(user) => {
                 if user.admin {
@@ -43,11 +51,12 @@ async fn require_permissions(db: &DatabaseConnection, session: Session) -> Resul
 
 #[utoipa::path(
     post,
-    path = "/group/create",
+    path = "/groups/create",
     responses(
         (status = 200, description = "Group created successfully"),
         (status = 403, description = "Insufficient permissions"),
-        (status = 404, description = "User not found", body = String)
+        (status = 404, description = "User not found", body = String),
+        (status = 500, description = "Internal server error", body = String)
     ),
     security(
         ("login" = [])
@@ -63,7 +72,51 @@ pub async fn create_group(
         Err(response) => return response,
     };
 
-    // Create group
+    match data::group::create_group(&db, payload).await {
+        Ok(group) => {
+            let dto: GroupDto = group.into();
 
-    (StatusCode::OK, "You have correct permissions").into_response()
+            (StatusCode::OK, Json(dto)).into_response()
+        }
+        Err(err) => {
+            println!("{}", err);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error creating new group",
+            )
+                .into_response()
+        }
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/groups",
+    responses(
+        (status = 200, description = "Returns a list of groups"),
+        (status = 403, description = "Insufficient permissions"),
+        (status = 404, description = "User not found", body = String),
+        (status = 500, description = "Internal server error", body = String)
+    ),
+    security(
+        ("login" = [])
+    )
+)]
+pub async fn get_groups(
+    Extension(db): Extension<DatabaseConnection>,
+    session: Session,
+) -> Response {
+    match require_permissions(&db, session).await {
+        Ok(_) => (),
+        Err(response) => return response,
+    };
+
+    match data::group::get_groups(&db).await {
+        Ok(groups) => {
+            let dto: Vec<GroupDto> = groups.into_iter().map(GroupDto::from).collect();
+
+            (StatusCode::OK, Json(dto)).into_response()
+        }
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error getting groups").into_response(),
+    }
 }
