@@ -22,7 +22,7 @@ Check [github issues](https://github.com/blackrose-eve/black-rose_auth-api/issue
 To implement a new feature
 
 1. Fork this repository ([HOWTO](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo))
-2. Create a new branch with `git checkout -b branch_name`
+2. Create a new branch in your forked repo with `git checkout -b branch_name`
 3. Commit changes to the branch
 4. Push to origin main `git push origin branch_name`
 5. Create a pull request ([HOWTO](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request))
