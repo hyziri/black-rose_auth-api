@@ -1,4 +1,5 @@
 use sea_orm_migration::prelude::*;
+use sea_orm_migration::sea_query::extension::postgres::Type;
 
 use crate::m20240222_000001_initial::AuthUser;
 use crate::m20240302_000002_permissions::AuthPermission;
@@ -9,6 +10,29 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_type(
+                Type::create()
+                    .as_enum(Alias::new("group_type"))
+                    .values([
+                        Alias::new("Open"),
+                        Alias::new("Apply"),
+                        Alias::new("Auto"),
+                        Alias::new("Hidden"),
+                    ])
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_type(
+                Type::create()
+                    .as_enum(Alias::new("group_filter_type"))
+                    .values([Alias::new("All"), Alias::new("Any")])
+                    .to_owned(),
+            )
+            .await?;
+
         manager
             .create_table(
                 Table::create()
@@ -22,6 +46,7 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(ColumnDef::new(AuthGroup::Name).string().not_null())
+                    .col(ColumnDef::new(AuthGroup::Description).text())
                     .col(
                         ColumnDef::new(AuthGroup::Confidential)
                             .boolean()
@@ -30,13 +55,23 @@ impl MigrationTrait for Migration {
                     )
                     .col(
                         ColumnDef::new(AuthGroup::GroupType)
-                            .string()
-                            .not_null()
-                            .default("Apply"),
+                            .enumeration(
+                                Alias::new("group_type"),
+                                [
+                                    Alias::new("Open"),
+                                    Alias::new("Apply"),
+                                    Alias::new("Auto"),
+                                    Alias::new("Hidden"),
+                                ],
+                            )
+                            .not_null(),
                     )
                     .col(
                         ColumnDef::new(AuthGroup::FilterType)
-                            .string()
+                            .enumeration(
+                                Alias::new("group_filter_type"),
+                                [Alias::new("All"), Alias::new("Any")],
+                            )
                             .not_null()
                             .default("All"),
                     )
@@ -116,9 +151,11 @@ impl MigrationTrait for Migration {
                     )
                     .col(
                         ColumnDef::new(AuthGroupFilter::FilterType)
-                            .string()
-                            .not_null()
-                            .default("All"),
+                            .enumeration(
+                                Alias::new("group_filter_type"),
+                                [Alias::new("All"), Alias::new("Any")],
+                            )
+                            .not_null(),
                     )
                     .to_owned(),
             )
@@ -132,6 +169,34 @@ impl MigrationTrait for Migration {
                     .from_col(AuthGroupFilter::GroupId)
                     .to_tbl(AuthGroup::Table)
                     .to_col(AuthGroup::Id)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_type(
+                Type::create()
+                    .as_enum(Alias::new("group_filter_criteria"))
+                    .values([
+                        Alias::new("Group"),
+                        Alias::new("Corporation"),
+                        Alias::new("Alliance"),
+                        Alias::new("Role"),
+                    ])
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_type(
+                Type::create()
+                    .as_enum(Alias::new("group_filter_criteria_type"))
+                    .values([
+                        Alias::new("Is"),
+                        Alias::new("IsNot"),
+                        Alias::new("GreaterThan"),
+                        Alias::new("LessThan"),
+                    ])
                     .to_owned(),
             )
             .await?;
@@ -151,15 +216,29 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(AuthGroupFilterRule::FilterId).integer())
                     .col(
                         ColumnDef::new(AuthGroupFilterRule::Criteria)
-                            .string()
-                            .not_null()
-                            .default("All"),
+                            .enumeration(
+                                Alias::new("group_filter_criteria"),
+                                [
+                                    Alias::new("Group"),
+                                    Alias::new("Corporation"),
+                                    Alias::new("Alliance"),
+                                    Alias::new("Role"),
+                                ],
+                            )
+                            .not_null(),
                     )
                     .col(
                         ColumnDef::new(AuthGroupFilterRule::CriteriaType)
-                            .string()
-                            .not_null()
-                            .default("IS"),
+                            .enumeration(
+                                Alias::new("group_filter_criteria_type"),
+                                [
+                                    Alias::new("Is"),
+                                    Alias::new("IsNot"),
+                                    Alias::new("GreaterThan"),
+                                    Alias::new("LessThan"),
+                                ],
+                            )
+                            .not_null(),
                     )
                     .col(
                         ColumnDef::new(AuthGroupFilterRule::CriteriaValue)
@@ -272,6 +351,22 @@ impl MigrationTrait for Migration {
             .await?;
 
         manager
+            .drop_type(
+                Type::drop()
+                    .name(Alias::new("group_filter_criteria_type"))
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .drop_type(
+                Type::drop()
+                    .name(Alias::new("group_filter_criteria"))
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
             .drop_foreign_key(
                 sea_query::ForeignKey::drop()
                     .name("fk-auth_group_filter-auth_group")
@@ -318,6 +413,18 @@ impl MigrationTrait for Migration {
             .drop_table(Table::drop().table(AuthGroup::Table).to_owned())
             .await?;
 
+        manager
+            .drop_type(
+                Type::drop()
+                    .name(Alias::new("group_filter_type"))
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .drop_type(Type::drop().name(Alias::new("group_type")).to_owned())
+            .await?;
+
         Ok(())
     }
 }
@@ -327,6 +434,7 @@ enum AuthGroup {
     Table,
     Id,
     Name,
+    Description,
     Confidential, // Whether or not members are hidden
     GroupType,    // Open, Auto, Apply, Hidden
     FilterType,   // All, Any

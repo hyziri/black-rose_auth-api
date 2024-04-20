@@ -1,5 +1,4 @@
-pub mod controller;
 pub mod data;
 pub mod model;
+pub mod route;
 pub mod seed;
-pub mod service;

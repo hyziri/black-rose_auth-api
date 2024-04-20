@@ -1,10 +1,13 @@
-# Black Rose Moons API
+# Black Rose Auth API
 
 ## Development
 
 1. Copy `.env.example` to `.env` and set variables
 2. Run `sudo docker-compose up -d` to initialize postgres & redis
 3. Run `cargo run`
+4. Navigate to `localhost:8080/docs` to see API routes schema
+
+Note: Login route don't work on swagger interface, to login you will need to navigate to it via your web browser: `localhost:8080/auth/login`.
 
 ### Sea-ORM
 
