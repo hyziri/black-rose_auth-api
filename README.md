@@ -1,15 +1,36 @@
 # Black Rose Auth API
 
-## Development
+This is the backend to the Black Rose Auth which is still heavily WIP.
 
-1. Copy `.env.example` to `.env` and set variables
-2. Run `sudo docker-compose up -d` to initialize postgres & redis
-3. Run `cargo run`
-4. Navigate to `localhost:8080/docs` to see API routes schema
+For testing/contributing see [CONTRIBUTING.md](https://github.com/blackrose-eve/black-rose_auth-api/blob/main/CONTRIBUTING.md)
 
-Note: Login route don't work on swagger interface, to login you will need to navigate to it via your web browser: `localhost:8080/auth/login`.
+## Roadmap
 
-### Sea-ORM
+### Auth - Groups & Permissions System
 
-- `sea-orm-cli migrate up` to run migrations or `sea-orm-cli migrate down` to remove them
-- Generate entities with `sea-orm-cli generate entity -o ./entity/src/entities/ --with-serde both --date-time-crate chrono`
+The purpose of groups is similar to the ACL system of EVE Online.
+
+Planned features:
+
+- Filters for groups to determine membership eligibility/removal based on criteria
+- Ability for alliances & corporations to be able to create their own groups
+- Organizations which represent multiple alliance/corporations
+- Group categories
+- Subgroups
+
+### Services - Discord/Mumble
+
+Link groups from auth to Discord/Mumble
+
+Planned features:
+
+- Multiple Discord/Mumble support
+- Alliance & corporation owned Discord/Mumble support
+- Pull groups from alliances/corporations which can be set to pull every group or only certain categories/groups
+
+### Features - Timerboard
+
+Planned features:
+
+- Alliance & corp owned timerboards
+- Relay timerboard to multiple Discords, for example all corporations part of Black Rose can also relay Black Rose's timerboard to their Discord
