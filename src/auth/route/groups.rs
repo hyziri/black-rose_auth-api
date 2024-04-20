@@ -1,26 +1,26 @@
 use axum::extract::Path;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::routing::delete;
 use axum::Json;
 use axum::{
     extract,
     response::Response,
-    routing::{get, post},
+    routing::{delete, get, post, put},
     Extension, Router,
 };
 use sea_orm::DatabaseConnection;
 use tower_sessions::Session;
 
 use crate::auth::data;
-use crate::auth::model::group::{GroupDto, NewGroupDto};
+use crate::auth::model::groups::{GroupDto, NewGroupDto};
 
 pub fn group_routes() -> Router {
     Router::new()
+        .route("/", post(create_group))
+        .route("/", get(get_groups))
         .route("/:id", get(get_group_by_id))
-        .route("/list", get(get_groups))
-        .route("/create", post(create_group))
-        .route("/delete/:id", delete(delete_group))
+        .route("/:id", put(update_group))
+        .route("/:id", delete(delete_group))
 }
 
 async fn require_permissions(db: &DatabaseConnection, session: Session) -> Result<(), Response> {
@@ -55,10 +55,10 @@ async fn require_permissions(db: &DatabaseConnection, session: Session) -> Resul
 
 #[utoipa::path(
     post,
-    path = "/group/create",
+    path = "/groups/create",
     responses(
-        (status = 200, description = "Group created successfully"),
-        (status = 403, description = "Insufficient permissions"),
+        (status = 200, description = "Created group info", body = GroupDto),
+        (status = 403, description = "Insufficient permissions", body = String),
         (status = 404, description = "User not found", body = String),
         (status = 500, description = "Internal server error", body = String)
     ),
@@ -76,7 +76,7 @@ pub async fn create_group(
         Err(response) => return response,
     };
 
-    match data::group::create_group(&db, payload).await {
+    match data::groups::create_group(&db, payload).await {
         Ok(group) => {
             let dto: GroupDto = group.into();
 
@@ -95,10 +95,10 @@ pub async fn create_group(
 
 #[utoipa::path(
     get,
-    path = "/group",
+    path = "/groups",
     responses(
-        (status = 200, description = "Returns a list of groups"),
-        (status = 403, description = "Insufficient permissions"),
+        (status = 200, description = "List of groups", body = Vec<GroupDto>),
+        (status = 403, description = "Insufficient permissions", body = String),
         (status = 404, description = "User not found", body = String),
         (status = 500, description = "Internal server error", body = String)
     ),
@@ -115,7 +115,7 @@ pub async fn get_groups(
         Err(response) => return response,
     };
 
-    match data::group::get_groups(&db).await {
+    match data::groups::get_groups(&db).await {
         Ok(groups) => {
             let dto: Vec<GroupDto> = groups.into_iter().map(GroupDto::from).collect();
 
@@ -127,10 +127,10 @@ pub async fn get_groups(
 
 #[utoipa::path(
     get,
-    path = "/group/{id}",
+    path = "/groups/{id}",
     responses(
-        (status = 200, description = "Returns group info"),
-        (status = 403, description = "Insufficient permissions"),
+        (status = 200, description = "Group info", body = GroupDto),
+        (status = 403, description = "Insufficient permissions", body = String),
         (status = 404, description = "Not found", body = String),
         (status = 500, description = "Internal server error", body = String)
     ),
@@ -148,7 +148,7 @@ pub async fn get_group_by_id(
         Err(response) => return response,
     };
 
-    match data::group::get_group_by_id(&db, id.0).await {
+    match data::groups::get_group_by_id(&db, id.0).await {
         Ok(group) => match group {
             Some(group) => {
                 let dto: GroupDto = group.into();
@@ -162,11 +162,45 @@ pub async fn get_group_by_id(
 }
 
 #[utoipa::path(
-    delete,
-    path = "/group/delete/{id}",
+    put,
+    path = "/groups/{id}",
     responses(
-        (status = 200, description = "Group deleted successfully"),
-        (status = 403, description = "Insufficient permissions"),
+        (status = 200, description = "Updated group info", body = GroupDto),
+        (status = 403, description = "Insufficient permissions", body = String),
+        (status = 404, description = "Not found", body = String),
+        (status = 500, description = "Internal server error", body = String)
+    ),
+    security(
+        ("login" = [])
+    )
+)]
+pub async fn update_group(
+    Extension(db): Extension<DatabaseConnection>,
+    session: Session,
+    Path(id): Path<(i32,)>,
+    extract::Json(payload): extract::Json<NewGroupDto>,
+) -> Response {
+    match require_permissions(&db, session).await {
+        Ok(_) => (),
+        Err(response) => return response,
+    };
+
+    match data::groups::update_group(&db, id.0, payload).await {
+        Ok(group) => {
+            let dto: GroupDto = group.into();
+
+            (StatusCode::OK, Json(dto)).into_response()
+        }
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error updating group").into_response(),
+    }
+}
+
+#[utoipa::path(
+    delete,
+    path = "/groups/{id}",
+    responses(
+        (status = 200, description = "Group deleted successfully", body = GroupDto),
+        (status = 403, description = "Insufficient permissions", body = String),
         (status = 404, description = "Not found", body = String),
         (status = 500, description = "Internal server error", body = String)
     ),
@@ -184,9 +218,9 @@ pub async fn delete_group(
         Err(response) => return response,
     };
 
-    match data::group::delete_group(&db, id.0).await {
+    match data::groups::delete_group(&db, id.0).await {
         Ok(result) => match result {
-            Some(id) => (StatusCode::OK, Json(id)).into_response(),
+            Some(id) => (StatusCode::OK, format!("Deleted group with id {}", id)).into_response(),
             None => (StatusCode::NOT_FOUND, "Group not found").into_response(),
         },
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error getting groups").into_response(),

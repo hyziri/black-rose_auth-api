@@ -46,7 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let binding = format!("0.0.0.0:{}", application_port);
 
     let listener = tokio::net::TcpListener::bind(&binding).await.unwrap();
-    println!("Now listening on {}", binding);
+    println!("\nNow listening on {}", binding);
 
     axum::serve(listener, app).await.unwrap();
 

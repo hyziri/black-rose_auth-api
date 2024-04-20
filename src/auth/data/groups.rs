@@ -3,7 +3,7 @@ use sea_orm::{
     QueryFilter,
 };
 
-use crate::auth::model::group::NewGroupDto;
+use crate::auth::model::groups::NewGroupDto;
 
 use entity::auth_group::Model as Group;
 
@@ -30,6 +30,23 @@ pub async fn get_group_by_id(db: &DatabaseConnection, id: i32) -> Result<Option<
         .filter(entity::auth_group::Column::Id.eq(id))
         .one(db)
         .await
+}
+
+pub async fn update_group(
+    db: &DatabaseConnection,
+    id: i32,
+    updated_group: NewGroupDto,
+) -> Result<Group, DbErr> {
+    let updated_group = entity::auth_group::ActiveModel {
+        id: Set(id),
+        name: Set(updated_group.name),
+        description: Set(updated_group.description),
+        confidential: Set(updated_group.confidential),
+        group_type: Set(updated_group.group_type.into()),
+        ..Default::default()
+    };
+
+    updated_group.update(db).await
 }
 
 pub async fn delete_group(db: &DatabaseConnection, id: i32) -> Result<Option<i32>, DbErr> {

@@ -142,7 +142,7 @@ pub async fn get_user_main_character(
     get,
     path = "/user/characters",
     responses(
-        (status = 200, description = "Returns list of all user characters", body = [CharacterAffiliationDto]),
+        (status = 200, description = "Returns list of all user characters", body = Vec<CharacterAffiliationDto>),
         (status = 404, description = "User not found", body = String),
         (status = 500, description = "Internal server error", body = String)
     ),

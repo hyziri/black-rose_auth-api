@@ -154,8 +154,6 @@ pub async fn callback(
     let set_main: Option<bool> = session.get("set_main").await.unwrap_or(None);
     let set_as_admin: Option<bool> = session.get("set_as_admin").await.unwrap_or(None);
 
-    let frontend_domain = env::var("FRONTEND_DOMAIN").expect("FRONTEND_DOMAIN must be set!");
-
     if state.is_none() || Some(params.state.clone()) != state {
         return (
             StatusCode::BAD_REQUEST,
@@ -213,14 +211,30 @@ pub async fn callback(
             .unwrap();
     }
 
-    let mut redirect_location = format!("http://{}/", frontend_domain);
+    let redirect_location = match env::var("FRONTEND_DOMAIN").ok().filter(|s| !s.is_empty()) {
+        Some(frontend_domain) => {
+            let mut redirect_location = format!("http://{}/", frontend_domain);
 
-    if let Some(true) = set_main {
-        if !ownership_entry.main {
-            let _ = update_user_main(&db, ownership_entry.character_id).await;
+            if let Some(true) = set_main {
+                if !ownership_entry.main {
+                    let _ = update_user_main(&db, ownership_entry.character_id).await;
 
-            redirect_location = format!("http://{}/settings", frontend_domain)
-        };
+                    redirect_location = format!("http://{}/settings", frontend_domain)
+                };
+            };
+
+            redirect_location
+        }
+        None => {
+            if cfg!(debug_assertions) {
+                let backend_domain =
+                    env::var("BACKEND_DOMAIN").expect("BACKEND_DOMAIN must be set");
+
+                format!("http://{}/docs", backend_domain)
+            } else {
+                panic!("FRONTEND_DOMAIN must be set")
+            }
+        }
     };
 
     session
@@ -241,9 +255,21 @@ pub async fn callback(
 pub async fn logout(session: Session) -> Redirect {
     session.clear().await;
 
-    let frontend_domain = env::var("FRONTEND_DOMAIN").expect("FRONTEND_DOMAIN must be set!");
+    let redirect_location = match env::var("FRONTEND_DOMAIN").ok().filter(|s| !s.is_empty()) {
+        Some(frontend_domain) => {
+            format!("http://{}/login", frontend_domain)
+        }
+        None => {
+            if cfg!(debug_assertions) {
+                let backend_domain =
+                    env::var("BACKEND_DOMAIN").expect("BACKEND_DOMAIN must be set");
 
-    let redirect_location = format!("http://{}/login", frontend_domain);
+                format!("http://{}/docs", backend_domain)
+            } else {
+                panic!("FRONTEND_DOMAIN must be set")
+            }
+        }
+    };
 
     Redirect::permanent(&redirect_location)
 }

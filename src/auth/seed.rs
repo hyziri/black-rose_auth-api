@@ -26,6 +26,8 @@ pub async fn create_admin(db: &DatabaseConnection) -> Result<(), sea_orm::DbErr>
         random_string
     }
 
+    let backend_domain = env::var("BACKEND_DOMAIN").expect("BACKEND_DOMAIN must be set!");
+
     let existing_admin = get_users_with_admin(db).await?;
 
     if existing_admin.is_empty() {
@@ -38,8 +40,6 @@ pub async fn create_admin(db: &DatabaseConnection) -> Result<(), sea_orm::DbErr>
 
         let _: () = con.set_ex("admin_setup_code", &random_string, 300).unwrap();
 
-        let backend_domain = env::var("BACKEND_DOMAIN").expect("BACKEND_DOMAIN must be set!");
-
         let login_link = format!(
             "http://{}/auth/login?admin_setup={}",
             backend_domain, random_string
@@ -49,6 +49,8 @@ pub async fn create_admin(db: &DatabaseConnection) -> Result<(), sea_orm::DbErr>
             "\nCreate an admin account by logging in with EVE Online via: {}\nThe admin login link will expire if not used within 5 minutes.",
             login_link
         );
+    } else if cfg!(debug_assertions) {
+        println!("\nLogin at http://{}/auth/login", backend_domain)
     };
 
     Ok(())

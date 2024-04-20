@@ -1,3 +1,3 @@
 pub mod auth;
-pub mod group;
+pub mod groups;
 pub mod user;
