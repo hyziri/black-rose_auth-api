@@ -258,7 +258,7 @@ impl MigrationTrait for Migration {
             .create_index(
                 Index::create()
                     .if_not_exists()
-                    .name("idx-auth_group_filter_group-group_id")
+                    .name("idx-auth_group_filter_rule-group_id")
                     .table(AuthGroupFilterRule::Table)
                     .col(AuthGroupFilterRule::GroupId)
                     .to_owned(),
@@ -269,7 +269,7 @@ impl MigrationTrait for Migration {
             .create_index(
                 Index::create()
                     .if_not_exists()
-                    .name("idx-auth_group_filter_group-filter_group_id")
+                    .name("idx-auth_group_filter_rule-filter_group_id")
                     .table(AuthGroupFilterRule::Table)
                     .col(AuthGroupFilterRule::FilterGroupId)
                     .to_owned(),
@@ -397,7 +397,7 @@ impl MigrationTrait for Migration {
         manager
             .drop_index(
                 sea_query::Index::drop()
-                    .name("idx-auth_group_filter_group-filter_group_id")
+                    .name("idx-auth_group_filter_rule-filter_group_id")
                     .to_owned(),
             )
             .await?;
@@ -405,7 +405,7 @@ impl MigrationTrait for Migration {
         manager
             .drop_index(
                 sea_query::Index::drop()
-                    .name("idx-auth_group_filter_group-group_id")
+                    .name("idx-auth_group_filter_rule-group_id")
                     .to_owned(),
             )
             .await?;

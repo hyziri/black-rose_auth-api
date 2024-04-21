@@ -7,8 +7,10 @@ use sea_orm::{Database, DatabaseConnection};
 use auth::seed::{create_admin, seed_auth_permissions};
 use axum::Extension;
 use eve_esi::initialize_eve_esi;
+use http::{header, Method, Request, Response};
 use std::env;
 use time::Duration;
+use tower_http::cors::{Any, CorsLayer};
 use tower_sessions::{cookie::SameSite, Expiry, SessionManagerLayer};
 use tower_sessions_redis_store::{fred::prelude::*, RedisStore};
 
@@ -41,7 +43,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = seed_auth_permissions(&db).await;
     let _ = create_admin(&db).await;
 
-    let app = router::routes().layer(Extension(db)).layer(session_layer);
+    let cors = CorsLayer::new()
+        // allow `GET` and `POST` when accessing the resource
+        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
+        // allow requests from any origin
+        .allow_origin(Any);
+
+    let app = router::routes()
+        .layer(Extension(db))
+        .layer(session_layer)
+        .layer(cors);
 
     let binding = format!("0.0.0.0:{}", application_port);
 

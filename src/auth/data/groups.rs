@@ -3,12 +3,12 @@ use sea_orm::{
     QueryFilter,
 };
 
-use crate::auth::model::groups::NewGroupDto;
+use crate::auth::model::groups::{GroupFilterGroupDto, GroupFilterRuleDto, NewGroupDto};
 
 use entity::auth_group::Model as Group;
 
 pub async fn create_group(db: &DatabaseConnection, new_group: NewGroupDto) -> Result<Group, DbErr> {
-    let new_group = entity::auth_group::ActiveModel {
+    let group = entity::auth_group::ActiveModel {
         name: Set(new_group.name),
         description: Set(new_group.description),
         confidential: Set(new_group.confidential),
@@ -17,9 +17,64 @@ pub async fn create_group(db: &DatabaseConnection, new_group: NewGroupDto) -> Re
         ..Default::default()
     };
 
-    let group = new_group.insert(db).await?;
+    let group = group.insert(db).await?;
+
+    create_filter_groups(db, group.id, new_group.filter_groups).await?;
+    create_filter_rules(db, group.id, None, new_group.filter_rules).await?;
 
     Ok(group)
+}
+
+pub async fn create_filter_groups(
+    db: &DatabaseConnection,
+    group_id: i32,
+    filter_groups: Vec<GroupFilterGroupDto>,
+) -> Result<(), DbErr> {
+    for group in filter_groups {
+        let new_group = entity::auth_group_filter_group::ActiveModel {
+            group_id: Set(group_id),
+            filter_type: Set(group.filter_type.into()),
+            ..Default::default()
+        };
+
+        let filter_group = new_group.insert(db).await?;
+
+        let _ = create_filter_rules(db, group_id, Some(filter_group.id), group.rules).await;
+    }
+
+    Ok(())
+}
+
+pub async fn create_filter_rules(
+    db: &DatabaseConnection,
+    group_id: i32,
+    filter_group: Option<i32>,
+    rules: Vec<GroupFilterRuleDto>,
+) -> Result<(), DbErr> {
+    if rules.is_empty() {
+        return Ok(());
+    }
+
+    let mut new_rules: Vec<entity::auth_group_filter_rule::ActiveModel> = vec![];
+
+    for rule in rules {
+        let new_rule = entity::auth_group_filter_rule::ActiveModel {
+            group_id: Set(group_id),
+            filter_group_id: Set(filter_group),
+            criteria: Set(rule.criteria.into()),
+            criteria_type: Set(rule.criteria_type.into()),
+            criteria_value: Set(rule.criteria_value),
+            ..Default::default()
+        };
+
+        new_rules.push(new_rule)
+    }
+
+    entity::prelude::AuthGroupFilterRule::insert_many(new_rules)
+        .exec(db)
+        .await?;
+
+    Ok(())
 }
 
 pub async fn get_groups(db: &DatabaseConnection) -> Result<Vec<Group>, DbErr> {

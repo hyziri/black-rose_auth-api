@@ -506,14 +506,17 @@ dependencies = [
  "entity",
  "eve_esi",
  "eve_oauth2",
+ "http 1.1.0",
  "migration",
  "oauth2",
  "rand",
  "redis",
+ "reqwest 0.12.4",
  "sea-orm",
  "serde",
  "time",
  "tokio",
+ "tower-http",
  "tower-sessions",
  "tower-sessions-redis-store",
  "utoipa",
@@ -1011,7 +1014,7 @@ checksum = "f7e67cbe2a6fd12bd6697ca0a68a4b94544ea60e5792ee24974125c605fa89d7"
 dependencies = [
  "chrono",
  "lazy_static",
- "reqwest 0.12.3",
+ "reqwest 0.12.4",
  "serde",
 ]
 
@@ -2576,9 +2579,9 @@ dependencies = [
 
 [[package]]
 name = "reqwest"
-version = "0.12.3"
+version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e6cc1e89e689536eb5aeede61520e874df5a4707df811cd5da4aa5fbb2aae19"
+checksum = "566cafdd92868e0939d3fb961bd0dc25fcfaaed179291093b3d43e6b3150ea10"
 dependencies = [
  "base64 0.22.0",
  "bytes",
@@ -3801,6 +3804,22 @@ dependencies = [
  "futures-util",
  "http 1.1.0",
  "parking_lot",
+ "pin-project-lite",
+ "tower-layer",
+ "tower-service",
+]
+
+[[package]]
+name = "tower-http"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e9cd434a998747dd2c4276bc96ee2e0c7a2eadf3cae88e52be55a05fa9053f5"
+dependencies = [
+ "bitflags 2.4.2",
+ "bytes",
+ "http 1.1.0",
+ "http-body 1.0.0",
+ "http-body-util",
  "pin-project-lite",
  "tower-layer",
  "tower-service",
