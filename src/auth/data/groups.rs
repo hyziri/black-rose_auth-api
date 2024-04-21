@@ -13,6 +13,7 @@ pub async fn create_group(db: &DatabaseConnection, new_group: NewGroupDto) -> Re
         description: Set(new_group.description),
         confidential: Set(new_group.confidential),
         group_type: Set(new_group.group_type.into()),
+        filter_type: Set(new_group.filter_type.into()),
         ..Default::default()
     };
 
@@ -43,7 +44,7 @@ pub async fn update_group(
         description: Set(updated_group.description),
         confidential: Set(updated_group.confidential),
         group_type: Set(updated_group.group_type.into()),
-        ..Default::default()
+        filter_type: Set(updated_group.filter_type.into()),
     };
 
     updated_group.update(db).await

@@ -11,9 +11,14 @@ You will need
 Starting the application
 
 1. Copy `.env.example` to `.env` and set variables, get ESI variables from [https://developers.eveonline.com/](https://developers.eveonline.com/) and creating an application.
-2. Run `sudo docker-compose up -d` to initialize postgres & redis
+2. Run `sudo docker-compose up -d` to initialize postgres & valkey
 3. Start the application with `cargo run`
 4. Follow the admin link provided in the terminal to create an admin account
+
+### sea-orm-cli
+
+- Run migrations with `sea-orm-cli migrate up` or `sea-orm-cli migrate down`
+- Generate entities with `sea-orm-cli generate entity -o ./entity/src/entities/ --with-serde both --date-time-crate chrono`
 
 ## Submitting new features
 
