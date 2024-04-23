@@ -2,7 +2,6 @@ use sea_orm_migration::prelude::*;
 use sea_orm_migration::sea_query::extension::postgres::Type;
 
 use crate::m20240222_000001_initial::AuthUser;
-use crate::m20240302_000002_permissions::AuthPermission;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -135,22 +134,22 @@ impl MigrationTrait for Migration {
         manager
             .create_table(
                 Table::create()
-                    .table(AuthGroupFilter::Table)
+                    .table(AuthGroupFilterGroup::Table)
                     .if_not_exists()
                     .col(
-                        ColumnDef::new(AuthGroupFilter::Id)
+                        ColumnDef::new(AuthGroupFilterGroup::Id)
                             .integer()
                             .not_null()
                             .auto_increment()
                             .primary_key(),
                     )
                     .col(
-                        ColumnDef::new(AuthGroupFilter::GroupId)
+                        ColumnDef::new(AuthGroupFilterGroup::GroupId)
                             .integer()
                             .not_null(),
                     )
                     .col(
-                        ColumnDef::new(AuthGroupFilter::FilterType)
+                        ColumnDef::new(AuthGroupFilterGroup::FilterType)
                             .enumeration(
                                 Alias::new("group_filter_type"),
                                 [Alias::new("All"), Alias::new("Any")],
@@ -162,11 +161,22 @@ impl MigrationTrait for Migration {
             .await?;
 
         manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .name("idx-auth_group_filter_group-group_id")
+                    .table(AuthGroupFilterGroup::Table)
+                    .col(AuthGroupFilterGroup::GroupId)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
             .create_foreign_key(
                 sea_query::ForeignKey::create()
-                    .name("fk-auth_group_filter-auth_group")
-                    .from_tbl(AuthGroupFilter::Table)
-                    .from_col(AuthGroupFilter::GroupId)
+                    .name("fk-auth_group_filter_group-auth_group")
+                    .from_tbl(AuthGroupFilterGroup::Table)
+                    .from_col(AuthGroupFilterGroup::GroupId)
                     .to_tbl(AuthGroup::Table)
                     .to_col(AuthGroup::Id)
                     .to_owned(),
@@ -213,7 +223,12 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(AuthGroupFilterRule::FilterId).integer())
+                    .col(
+                        ColumnDef::new(AuthGroupFilterRule::GroupId)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(AuthGroupFilterRule::FilterGroupId).integer())
                     .col(
                         ColumnDef::new(AuthGroupFilterRule::Criteria)
                             .enumeration(
@@ -250,39 +265,23 @@ impl MigrationTrait for Migration {
             .await?;
 
         manager
-            .create_foreign_key(
-                sea_query::ForeignKey::create()
-                    .name("fk-auth_group_filter-auth_group_filter")
-                    .from_tbl(AuthGroupFilterRule::Table)
-                    .from_col(AuthGroupFilterRule::FilterId)
-                    .to_tbl(AuthGroupFilter::Table)
-                    .to_col(AuthGroupFilter::Id)
-                    .to_owned(),
-            )
-            .await?;
-
-        manager
-            .create_table(
-                Table::create()
-                    .table(AuthGroupPermission::Table)
+            .create_index(
+                Index::create()
                     .if_not_exists()
-                    .col(
-                        ColumnDef::new(AuthGroupPermission::Id)
-                            .integer()
-                            .not_null()
-                            .auto_increment()
-                            .primary_key(),
-                    )
-                    .col(
-                        ColumnDef::new(AuthGroupPermission::GroupId)
-                            .integer()
-                            .not_null(),
-                    )
-                    .col(
-                        ColumnDef::new(AuthGroupPermission::PermissionId)
-                            .integer()
-                            .not_null(),
-                    )
+                    .name("idx-auth_group_filter_rule-group_id")
+                    .table(AuthGroupFilterRule::Table)
+                    .col(AuthGroupFilterRule::GroupId)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .name("idx-auth_group_filter_rule-filter_group_id")
+                    .table(AuthGroupFilterRule::Table)
+                    .col(AuthGroupFilterRule::FilterGroupId)
                     .to_owned(),
             )
             .await?;
@@ -290,9 +289,9 @@ impl MigrationTrait for Migration {
         manager
             .create_foreign_key(
                 sea_query::ForeignKey::create()
-                    .name("fk-auth_group_permission-auth_group")
-                    .from_tbl(AuthGroupPermission::Table)
-                    .from_col(AuthGroupPermission::GroupId)
+                    .name("fk-auth_group_filter_rule-auth_group")
+                    .from_tbl(AuthGroupFilterRule::Table)
+                    .from_col(AuthGroupFilterRule::GroupId)
                     .to_tbl(AuthGroup::Table)
                     .to_col(AuthGroup::Id)
                     .to_owned(),
@@ -302,11 +301,11 @@ impl MigrationTrait for Migration {
         manager
             .create_foreign_key(
                 sea_query::ForeignKey::create()
-                    .name("fk-auth_group_permission-auth_permission")
-                    .from_tbl(AuthGroupPermission::Table)
-                    .from_col(AuthGroupPermission::PermissionId)
-                    .to_tbl(AuthPermission::Table)
-                    .to_col(AuthPermission::Id)
+                    .name("fk-auth_group_filter_rule-auth_group_filter_group")
+                    .from_tbl(AuthGroupFilterRule::Table)
+                    .from_col(AuthGroupFilterRule::FilterGroupId)
+                    .to_tbl(AuthGroupFilterGroup::Table)
+                    .to_col(AuthGroupFilterGroup::Id)
                     .to_owned(),
             )
             .await?;
@@ -318,30 +317,33 @@ impl MigrationTrait for Migration {
         manager
             .drop_foreign_key(
                 sea_query::ForeignKey::drop()
-                    .name("fk-auth_group_permission-auth_permission")
-                    .table(AuthGroupPermission::Table)
-                    .to_owned(),
-            )
-            .await?;
-
-        manager
-            .drop_foreign_key(
-                sea_query::ForeignKey::drop()
-                    .name("fk-auth_group_permission-auth_group")
-                    .table(AuthGroupPermission::Table)
-                    .to_owned(),
-            )
-            .await?;
-
-        manager
-            .drop_table(Table::drop().table(AuthGroupPermission::Table).to_owned())
-            .await?;
-
-        manager
-            .drop_foreign_key(
-                sea_query::ForeignKey::drop()
-                    .name("fk-auth_group_filter-auth_group_filter")
+                    .name("fk-auth_group_filter_rule-auth_group_filter_group")
                     .table(AuthGroupFilterRule::Table)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .drop_foreign_key(
+                sea_query::ForeignKey::drop()
+                    .name("fk-auth_group_filter_rule-auth_group")
+                    .table(AuthGroupFilterRule::Table)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .drop_index(
+                sea_query::Index::drop()
+                    .name("idx-auth_group_filter_rule-filter_group_id")
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .drop_index(
+                sea_query::Index::drop()
+                    .name("idx-auth_group_filter_rule-group_id")
                     .to_owned(),
             )
             .await?;
@@ -369,14 +371,22 @@ impl MigrationTrait for Migration {
         manager
             .drop_foreign_key(
                 sea_query::ForeignKey::drop()
-                    .name("fk-auth_group_filter-auth_group")
-                    .table(AuthGroupFilter::Table)
+                    .name("fk-auth_group_filter_group-auth_group")
+                    .table(AuthGroupFilterGroup::Table)
                     .to_owned(),
             )
             .await?;
 
         manager
-            .drop_table(Table::drop().table(AuthGroupFilter::Table).to_owned())
+            .drop_index(
+                sea_query::Index::drop()
+                    .name("idx-auth_group_filter_group-group_id")
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .drop_table(Table::drop().table(AuthGroupFilterGroup::Table).to_owned())
             .await?;
 
         manager
@@ -449,7 +459,7 @@ enum AuthGroupUser {
 }
 
 #[derive(DeriveIden)]
-enum AuthGroupFilter {
+enum AuthGroupFilterGroup {
     Table,
     Id,
     GroupId,
@@ -460,16 +470,9 @@ enum AuthGroupFilter {
 enum AuthGroupFilterRule {
     Table,
     Id,
-    FilterId,      // If null then it is not part of a filter group
+    FilterGroupId,
+    GroupId,       // If null then it is not part of a filter group
     Criteria,      // Group, Corporation, Alliance, Role
     CriteriaType,  // IS, IS NOT, GREATER THAN, LESS THAN
     CriteriaValue, // GroupId, CorporationId, AllianceId, Corp CEO/Executor
-}
-
-#[derive(DeriveIden)]
-enum AuthGroupPermission {
-    Table,
-    Id,
-    GroupId,
-    PermissionId,
 }

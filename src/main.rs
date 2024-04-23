@@ -4,7 +4,7 @@ mod router;
 
 use sea_orm::{Database, DatabaseConnection};
 
-use auth::seed::{create_admin, seed_auth_permissions};
+use auth::seed::create_admin;
 use axum::Extension;
 use eve_esi::initialize_eve_esi;
 use std::env;
@@ -34,11 +34,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let session_layer = SessionManagerLayer::new(session_store)
         .with_secure(false)
         .with_same_site(SameSite::Lax)
-        .with_expiry(Expiry::OnInactivity(Duration::seconds(120)));
+        .with_expiry(Expiry::OnInactivity(Duration::days(1)));
 
     initialize_eve_esi(application_name, application_email);
 
-    let _ = seed_auth_permissions(&db).await;
     let _ = create_admin(&db).await;
 
     let app = router::routes().layer(Extension(db)).layer(session_layer);
