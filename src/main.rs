@@ -7,7 +7,7 @@ use sea_orm::{Database, DatabaseConnection};
 use auth::seed::{create_admin, seed_auth_permissions};
 use axum::Extension;
 use eve_esi::initialize_eve_esi;
-use http::{header, Method, Request, Response};
+use http::Method;
 use std::env;
 use time::Duration;
 use tower_http::cors::{Any, CorsLayer};

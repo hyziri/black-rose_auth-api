@@ -1,7 +1,10 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-#[derive(Serialize, Deserialize, ToSchema)]
+// TODO
+// The impl for all the enums could be replaced with a macro as all fields are the exact same
+
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
 pub enum GroupType {
     Open,
     Auto,
@@ -31,7 +34,7 @@ impl From<entity::sea_orm_active_enums::GroupType> for GroupType {
     }
 }
 
-#[derive(Serialize, Deserialize, ToSchema)]
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
 pub enum GroupFilterType {
     All,
     Any,
@@ -55,7 +58,7 @@ impl From<entity::sea_orm_active_enums::GroupFilterType> for GroupFilterType {
     }
 }
 
-#[derive(Serialize, Deserialize, ToSchema)]
+#[derive(Serialize, Deserialize, ToSchema, Copy, Clone)]
 pub enum GroupFilterCriteria {
     Group,
     Corporation,
@@ -93,7 +96,7 @@ impl From<entity::sea_orm_active_enums::GroupFilterCriteria> for GroupFilterCrit
     }
 }
 
-#[derive(Serialize, Deserialize, ToSchema)]
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
 pub enum GroupFilterCriteriaType {
     Is,
     IsNot,
@@ -158,6 +161,21 @@ impl From<entity::auth_group::Model> for GroupDto {
     }
 }
 
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct GroupFilterGroupDto {
+    pub id: i32,
+    pub filter_type: GroupFilterType,
+    pub rules: Vec<GroupFilterRuleDto>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
+pub struct GroupFilterRuleDto {
+    pub id: i32,
+    pub criteria: GroupFilterCriteria,
+    pub criteria_type: GroupFilterCriteriaType,
+    pub criteria_value: String,
+}
+
 #[derive(Deserialize, ToSchema)]
 pub struct NewGroupDto {
     pub name: String,
@@ -165,19 +183,93 @@ pub struct NewGroupDto {
     pub description: Option<String>,
     pub group_type: GroupType,
     pub filter_type: GroupFilterType,
-    pub filter_rules: Vec<GroupFilterRuleDto>,
-    pub filter_groups: Vec<GroupFilterGroupDto>,
+    pub filter_rules: Vec<NewGroupFilterRuleDto>,
+    pub filter_groups: Vec<NewGroupFilterGroupDto>,
 }
 
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct GroupFilterRuleDto {
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
+pub struct NewGroupFilterRuleDto {
     pub criteria: GroupFilterCriteria,
     pub criteria_type: GroupFilterCriteriaType,
     pub criteria_value: String,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
-pub struct GroupFilterGroupDto {
+pub struct NewGroupFilterGroupDto {
     pub filter_type: GroupFilterType,
-    pub rules: Vec<GroupFilterRuleDto>,
+    pub rules: Vec<NewGroupFilterRuleDto>,
+}
+
+#[derive(Deserialize, ToSchema, Clone)]
+pub struct UpdateGroupDto {
+    pub name: String,
+    pub description: Option<String>,
+    pub confidential: bool,
+    pub group_type: GroupType,
+    pub filter_type: GroupFilterType,
+    pub filter_rules: Vec<UpdateGroupFilterRuleDto>,
+    pub filter_groups: Vec<UpdateGroupFilterGroupDto>,
+}
+
+impl From<UpdateGroupDto> for NewGroupDto {
+    fn from(model: UpdateGroupDto) -> Self {
+        let new_rules: Vec<NewGroupFilterRuleDto> = model
+            .filter_rules
+            .into_iter()
+            .map(|rule| rule.into())
+            .collect();
+
+        let new_groups: Vec<NewGroupFilterGroupDto> = model
+            .filter_groups
+            .into_iter()
+            .map(|rule| rule.into())
+            .collect();
+
+        NewGroupDto {
+            name: model.name,
+            description: model.description,
+            confidential: model.confidential,
+            group_type: model.group_type,
+            filter_type: model.filter_type,
+            filter_groups: new_groups,
+            filter_rules: new_rules,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
+pub struct UpdateGroupFilterGroupDto {
+    pub id: Option<i32>,
+    pub filter_type: GroupFilterType,
+    pub rules: Vec<UpdateGroupFilterRuleDto>,
+}
+
+impl From<UpdateGroupFilterGroupDto> for NewGroupFilterGroupDto {
+    fn from(model: UpdateGroupFilterGroupDto) -> Self {
+        let new_rules: Vec<NewGroupFilterRuleDto> =
+            model.rules.into_iter().map(|rule| rule.into()).collect();
+
+        NewGroupFilterGroupDto {
+            filter_type: model.filter_type,
+            rules: new_rules,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
+pub struct UpdateGroupFilterRuleDto {
+    pub id: Option<i32>,
+    pub criteria: GroupFilterCriteria,
+    pub criteria_type: GroupFilterCriteriaType,
+    pub criteria_value: String,
+}
+
+impl From<UpdateGroupFilterRuleDto> for NewGroupFilterRuleDto {
+    fn from(model: UpdateGroupFilterRuleDto) -> Self {
+        NewGroupFilterRuleDto {
+            criteria: model.criteria,
+            criteria_type: model.criteria_type,
+            criteria_value: model.criteria_value,
+        }
+    }
 }

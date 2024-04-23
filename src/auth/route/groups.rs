@@ -13,7 +13,9 @@ use sea_orm::DatabaseConnection;
 use tower_sessions::Session;
 
 use crate::auth::data;
-use crate::auth::model::groups::{GroupDto, GroupFilterCriteria, GroupFilterRuleDto, NewGroupDto};
+use crate::auth::model::groups::{
+    GroupDto, GroupFilterCriteria, NewGroupDto, NewGroupFilterRuleDto, UpdateGroupDto,
+};
 
 pub fn group_routes() -> Router {
     Router::new()
@@ -56,7 +58,7 @@ async fn require_permissions(db: &DatabaseConnection, session: Session) -> Resul
 
 async fn validate_filter_rules(
     db: &DatabaseConnection,
-    rules: &Vec<GroupFilterRuleDto>,
+    rules: &Vec<NewGroupFilterRuleDto>,
 ) -> Result<(), anyhow::Error> {
     for rule in rules {
         match rule.criteria {
@@ -279,14 +281,14 @@ pub async fn update_group(
     Extension(db): Extension<DatabaseConnection>,
     session: Session,
     Path(id): Path<(i32,)>,
-    extract::Json(payload): extract::Json<NewGroupDto>,
+    extract::Json(payload): extract::Json<UpdateGroupDto>,
 ) -> Response {
     match require_permissions(&db, session).await {
         Ok(_) => (),
         Err(response) => return response,
     };
 
-    match validate_group_filters(&db, &payload).await {
+    match validate_group_filters(&db, &payload.clone().into()).await {
         Ok(_) => (),
         Err(err) => {
             if err.is::<sea_orm::DbErr>() {
@@ -300,9 +302,6 @@ pub async fn update_group(
             return (StatusCode::BAD_REQUEST, err.to_string()).into_response();
         }
     }
-
-    // Add filter updating functionality to update_group data function
-    todo!();
 
     match data::groups::update_group(&db, id.0, payload).await {
         Ok(group) => {
