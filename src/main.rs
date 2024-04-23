@@ -4,13 +4,11 @@ mod router;
 
 use sea_orm::{Database, DatabaseConnection};
 
-use auth::seed::{create_admin, seed_auth_permissions};
+use auth::seed::create_admin;
 use axum::Extension;
 use eve_esi::initialize_eve_esi;
-use http::Method;
 use std::env;
 use time::Duration;
-use tower_http::cors::{Any, CorsLayer};
 use tower_sessions::{cookie::SameSite, Expiry, SessionManagerLayer};
 use tower_sessions_redis_store::{fred::prelude::*, RedisStore};
 
@@ -40,7 +38,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     initialize_eve_esi(application_name, application_email);
 
-    let _ = seed_auth_permissions(&db).await;
     let _ = create_admin(&db).await;
 
     let app = router::routes().layer(Extension(db)).layer(session_layer);

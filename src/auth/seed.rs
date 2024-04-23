@@ -5,14 +5,6 @@ use std::env;
 
 use crate::auth::data::user::get_users_with_admin;
 
-pub async fn seed_auth_permissions(db: &DatabaseConnection) -> Result<(), sea_orm::DbErr> {
-    let module_name = "Auth".to_string();
-
-    // create_permission(db, &module_name, "Admin", true).await?;
-
-    Ok(())
-}
-
 pub async fn create_admin(db: &DatabaseConnection) -> Result<(), sea_orm::DbErr> {
     fn generate_random_string() -> String {
         let length = rand::thread_rng().gen_range(20..=64);

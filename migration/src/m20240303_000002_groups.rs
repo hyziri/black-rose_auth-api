@@ -2,7 +2,6 @@ use sea_orm_migration::prelude::*;
 use sea_orm_migration::sea_query::extension::postgres::Type;
 
 use crate::m20240222_000001_initial::AuthUser;
-use crate::m20240302_000002_permissions::AuthPermission;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -311,82 +310,10 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        manager
-            .create_table(
-                Table::create()
-                    .table(AuthGroupPermission::Table)
-                    .if_not_exists()
-                    .col(
-                        ColumnDef::new(AuthGroupPermission::Id)
-                            .integer()
-                            .not_null()
-                            .auto_increment()
-                            .primary_key(),
-                    )
-                    .col(
-                        ColumnDef::new(AuthGroupPermission::GroupId)
-                            .integer()
-                            .not_null(),
-                    )
-                    .col(
-                        ColumnDef::new(AuthGroupPermission::PermissionId)
-                            .integer()
-                            .not_null(),
-                    )
-                    .to_owned(),
-            )
-            .await?;
-
-        manager
-            .create_foreign_key(
-                sea_query::ForeignKey::create()
-                    .name("fk-auth_group_permission-auth_group")
-                    .from_tbl(AuthGroupPermission::Table)
-                    .from_col(AuthGroupPermission::GroupId)
-                    .to_tbl(AuthGroup::Table)
-                    .to_col(AuthGroup::Id)
-                    .to_owned(),
-            )
-            .await?;
-
-        manager
-            .create_foreign_key(
-                sea_query::ForeignKey::create()
-                    .name("fk-auth_group_permission-auth_permission")
-                    .from_tbl(AuthGroupPermission::Table)
-                    .from_col(AuthGroupPermission::PermissionId)
-                    .to_tbl(AuthPermission::Table)
-                    .to_col(AuthPermission::Id)
-                    .to_owned(),
-            )
-            .await?;
-
         Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .drop_foreign_key(
-                sea_query::ForeignKey::drop()
-                    .name("fk-auth_group_permission-auth_permission")
-                    .table(AuthGroupPermission::Table)
-                    .to_owned(),
-            )
-            .await?;
-
-        manager
-            .drop_foreign_key(
-                sea_query::ForeignKey::drop()
-                    .name("fk-auth_group_permission-auth_group")
-                    .table(AuthGroupPermission::Table)
-                    .to_owned(),
-            )
-            .await?;
-
-        manager
-            .drop_table(Table::drop().table(AuthGroupPermission::Table).to_owned())
-            .await?;
-
         manager
             .drop_foreign_key(
                 sea_query::ForeignKey::drop()
@@ -548,12 +475,4 @@ enum AuthGroupFilterRule {
     Criteria,      // Group, Corporation, Alliance, Role
     CriteriaType,  // IS, IS NOT, GREATER THAN, LESS THAN
     CriteriaValue, // GroupId, CorporationId, AllianceId, Corp CEO/Executor
-}
-
-#[derive(DeriveIden)]
-enum AuthGroupPermission {
-    Table,
-    Id,
-    GroupId,
-    PermissionId,
 }
