@@ -22,6 +22,7 @@ pub fn group_routes() -> Router {
         .route("/", post(create_group))
         .route("/", get(get_groups))
         .route("/:id", get(get_group_by_id))
+        .route("/:id/filters", get(get_group_filters))
         .route("/:id", put(update_group))
         .route("/:id", delete(delete_group))
 }
@@ -261,6 +262,44 @@ pub async fn get_group_by_id(
             None => (StatusCode::NOT_FOUND, "Group not found").into_response(),
         },
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error getting groups").into_response(),
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/groups/{id}/filters",
+    responses(
+        (status = 200, description = "Group filters", body = Vec<GroupFilterDto>),
+        (status = 403, description = "Insufficient permissions", body = String),
+        (status = 404, description = "Not found", body = String),
+        (status = 500, description = "Internal server error", body = String)
+    ),
+    security(
+        ("login" = [])
+    )
+)]
+pub async fn get_group_filters(
+    Extension(db): Extension<DatabaseConnection>,
+    session: Session,
+    Path(id): Path<(i32,)>,
+) -> Response {
+    use crate::auth::data::groups::get_group_filters;
+
+    match require_permissions(&db, session).await {
+        Ok(_) => (),
+        Err(response) => return response,
+    };
+
+    match get_group_filters(&db, id.0).await {
+        Ok(filters) => match filters {
+            Some(filters) => (StatusCode::OK, Json(filters)).into_response(),
+            None => (StatusCode::NOT_FOUND, "Group filters not found").into_response(),
+        },
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Error getting group filters",
+        )
+            .into_response(),
     }
 }
 

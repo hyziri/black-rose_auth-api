@@ -4,8 +4,8 @@ use sea_orm::{
 };
 
 use crate::auth::model::groups::{
-    NewGroupDto, NewGroupFilterGroupDto, NewGroupFilterRuleDto, UpdateGroupDto,
-    UpdateGroupFilterGroupDto, UpdateGroupFilterRuleDto,
+    GroupFilterGroupDto, GroupFilters, NewGroupDto, NewGroupFilterGroupDto, NewGroupFilterRuleDto,
+    UpdateGroupDto, UpdateGroupFilterGroupDto, UpdateGroupFilterRuleDto,
 };
 
 use entity::auth_group::Model as Group;
@@ -93,6 +93,59 @@ pub async fn get_group_by_id(db: &DatabaseConnection, id: i32) -> Result<Option<
         .filter(entity::auth_group::Column::Id.eq(id))
         .one(db)
         .await
+}
+
+pub async fn get_group_filters(
+    db: &DatabaseConnection,
+    id: i32,
+) -> Result<Option<GroupFilters>, DbErr> {
+    let group = entity::prelude::AuthGroup::find()
+        .filter(entity::auth_group::Column::Id.eq(id))
+        .one(db)
+        .await?;
+
+    match group {
+        Some(group) => {
+            let filter_rules = entity::prelude::AuthGroupFilterRule::find()
+                .filter(entity::auth_group_filter_rule::Column::GroupId.eq(id))
+                .filter(entity::auth_group_filter_rule::Column::FilterGroupId.is_null())
+                .all(db)
+                .await?;
+
+            let filter_groups = entity::prelude::AuthGroupFilterGroup::find()
+                .filter(entity::auth_group_filter_group::Column::GroupId.eq(id))
+                .all(db)
+                .await?;
+
+            let mut groups: Vec<GroupFilterGroupDto> = vec![];
+
+            for group in filter_groups {
+                let rules = entity::prelude::AuthGroupFilterRule::find()
+                    .filter(entity::auth_group_filter_rule::Column::GroupId.eq(id))
+                    .filter(entity::auth_group_filter_rule::Column::FilterGroupId.eq(group.id))
+                    .all(db)
+                    .await?;
+
+                let group = GroupFilterGroupDto {
+                    id: group.id,
+                    filter_type: group.filter_type.into(),
+                    rules: rules.into_iter().map(|rule| rule.into()).collect(),
+                };
+
+                groups.push(group)
+            }
+
+            let result = GroupFilters {
+                id: group.id,
+                filter_type: group.filter_type.into(),
+                filter_rules: filter_rules.into_iter().map(|rule| rule.into()).collect(),
+                filter_groups: groups,
+            };
+
+            Ok(Some(result))
+        }
+        None => Ok(None),
+    }
 }
 
 pub async fn update_group(

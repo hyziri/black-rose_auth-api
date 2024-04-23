@@ -162,6 +162,14 @@ impl From<entity::auth_group::Model> for GroupDto {
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
+pub struct GroupFilters {
+    pub id: i32,
+    pub filter_type: GroupFilterType,
+    pub filter_rules: Vec<GroupFilterRuleDto>,
+    pub filter_groups: Vec<GroupFilterGroupDto>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct GroupFilterGroupDto {
     pub id: i32,
     pub filter_type: GroupFilterType,
@@ -174,6 +182,17 @@ pub struct GroupFilterRuleDto {
     pub criteria: GroupFilterCriteria,
     pub criteria_type: GroupFilterCriteriaType,
     pub criteria_value: String,
+}
+
+impl From<entity::auth_group_filter_rule::Model> for GroupFilterRuleDto {
+    fn from(model: entity::auth_group_filter_rule::Model) -> Self {
+        GroupFilterRuleDto {
+            id: model.id,
+            criteria: model.criteria.into(),
+            criteria_type: model.criteria_type.into(),
+            criteria_value: model.criteria_value,
+        }
+    }
 }
 
 #[derive(Deserialize, ToSchema)]

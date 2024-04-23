@@ -4,7 +4,7 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::auth::model::{
     groups::{
-        GroupDto, GroupFilterCriteria, GroupFilterCriteriaType, GroupFilterGroupDto,
+        GroupFilters, GroupDto, GroupFilterCriteria, GroupFilterCriteriaType, GroupFilterGroupDto,
         GroupFilterRuleDto, GroupFilterType, GroupType, NewGroupDto, NewGroupFilterGroupDto,
         NewGroupFilterRuleDto, UpdateGroupDto, UpdateGroupFilterGroupDto, UpdateGroupFilterRuleDto,
     },
@@ -17,21 +17,15 @@ pub fn routes() -> Router {
     #[derive(OpenApi)]
     #[openapi(
         paths(
-            auth::login,
-            auth::logout,
-            user::get_user,
-            user::get_user_main_character,
-            user::get_user_characters,
-            groups::create_group,
-            groups::get_groups,
-            groups::get_group_by_id,
-            groups::update_group,
-            groups::delete_group
+            auth::login, auth::logout,
+            user::get_user, user::get_user_main_character, user::get_user_characters,
+            groups::create_group, groups::get_groups, groups::get_group_by_id,
+            groups::get_group_filters, groups::update_group, groups::delete_group
         ),
         components(schemas(
             UserDto, CharacterAffiliationDto, 
             NewGroupDto, NewGroupFilterGroupDto, NewGroupFilterRuleDto,  
-            GroupDto, GroupFilterRuleDto, GroupFilterGroupDto, 
+            GroupFilters, GroupDto, GroupFilterRuleDto, GroupFilterGroupDto, 
             UpdateGroupDto, UpdateGroupFilterRuleDto, UpdateGroupFilterGroupDto,
             GroupType, GroupFilterType, GroupFilterCriteria, GroupFilterCriteriaType)),
         tags(
