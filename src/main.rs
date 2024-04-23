@@ -36,23 +36,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let session_layer = SessionManagerLayer::new(session_store)
         .with_secure(false)
         .with_same_site(SameSite::Lax)
-        .with_expiry(Expiry::OnInactivity(Duration::seconds(120)));
+        .with_expiry(Expiry::OnInactivity(Duration::days(1)));
 
     initialize_eve_esi(application_name, application_email);
 
     let _ = seed_auth_permissions(&db).await;
     let _ = create_admin(&db).await;
 
-    let cors = CorsLayer::new()
-        // allow `GET` and `POST` when accessing the resource
-        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
-        // allow requests from any origin
-        .allow_origin(Any);
-
-    let app = router::routes()
-        .layer(Extension(db))
-        .layer(session_layer)
-        .layer(cors);
+    let app = router::routes().layer(Extension(db)).layer(session_layer);
 
     let binding = format!("0.0.0.0:{}", application_port);
 

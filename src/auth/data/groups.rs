@@ -22,12 +22,10 @@ pub async fn create_group(db: &DatabaseConnection, new_group: NewGroupDto) -> Re
 
     let group = group.insert(db).await?;
 
-    // Prevent creation of duplicate rules
-
     create_filter_groups(db, group.id, new_group.filter_groups).await?;
     bulk_create_filter_rules(db, group.id, None, new_group.filter_rules).await?;
 
-    // if group type is auto find all people who meet filters and add to group
+    // Queue update group members task
 
     Ok(group)
 }
@@ -166,6 +164,8 @@ pub async fn update_group(
 
     update_filter_rules(db, id, None, group.filter_rules).await?;
     update_filter_groups(db, id, group.filter_groups).await?;
+
+    // Queue update group members task
 
     Ok(updated_group)
 }
