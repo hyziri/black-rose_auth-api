@@ -57,9 +57,6 @@ pub async fn get_character(
         .await
 }
 
-/// Get a vec of existing characters
-///
-/// If character_id is not found in the database then it will not be returned
 pub async fn bulk_get_characters(
     db: &DatabaseConnection,
     character_ids: Vec<i32>,
