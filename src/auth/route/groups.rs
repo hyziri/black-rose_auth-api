@@ -283,14 +283,12 @@ pub async fn get_group_filters(
     session: Session,
     Path(id): Path<(i32,)>,
 ) -> Response {
-    use crate::auth::data::groups::get_group_filters;
-
     match require_permissions(&db, session).await {
         Ok(_) => (),
         Err(response) => return response,
     };
 
-    match get_group_filters(&db, id.0).await {
+    match data::groups::get_group_filters(&db, id.0).await {
         Ok(filters) => match filters {
             Some(filters) => (StatusCode::OK, Json(filters)).into_response(),
             None => (StatusCode::NOT_FOUND, "Group filters not found").into_response(),
@@ -301,6 +299,19 @@ pub async fn get_group_filters(
         )
             .into_response(),
     }
+}
+
+pub async fn join_group(
+    Extension(db): Extension<DatabaseConnection>,
+    session: Session,
+    Path(id): Path<(i32,)>,
+) -> Response {
+    match require_permissions(&db, session).await {
+        Ok(_) => (),
+        Err(response) => return response,
+    };
+
+    // data join group function
 }
 
 #[utoipa::path(

@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use entity::auth_user::Model as User;
 use entity::auth_user_character_ownership::Model as UserCharacterOwnership;
 
-use crate::auth::model::user::UserAffiliation;
+use crate::auth::model::user::{UserAffiliation, UserGroups};
 use crate::eve::data::character::bulk_get_character_affiliations;
 
 pub async fn create_user(db: &DatabaseConnection) -> Result<i32, DbErr> {
@@ -153,7 +153,7 @@ pub async fn bulk_get_user_affiliations(
 ) -> Result<Vec<UserAffiliation>, DbErr> {
     let ownerships = bulk_get_character_ownerships(db, user_ids).await?;
     let character_ids: Vec<i32> = ownerships.iter().map(|char| char.character_id).collect();
-    let affiliations = bulk_get_character_affiliations(db, character_ids).await?;
+    let affiliations = bulk_get_character_affiliations(db, character_ids.clone()).await?;
 
     let mut user_affiliations: HashMap<i32, UserAffiliation> = HashMap::new();
     let ownerships_map: HashMap<i32, &entity::auth_user_character_ownership::Model> = ownerships
@@ -166,6 +166,7 @@ pub async fn bulk_get_user_affiliations(
             .entry(ownership.user_id)
             .or_insert(UserAffiliation {
                 user_id: ownership.user_id,
+                characters: Vec::new(),
                 corporations: Vec::new(),
                 alliances: Vec::new(),
             });
@@ -174,6 +175,7 @@ pub async fn bulk_get_user_affiliations(
     for affiliation in &affiliations {
         if let Some(ownership) = ownerships_map.get(&affiliation.character_id) {
             if let Some(user_affiliation) = user_affiliations.get_mut(&ownership.user_id) {
+                user_affiliation.characters.push(affiliation.character_id);
                 user_affiliation
                     .corporations
                     .push(affiliation.corporation_id);
@@ -187,6 +189,33 @@ pub async fn bulk_get_user_affiliations(
     let user_affiliations = user_affiliations.into_iter().map(|(_, v)| v).collect();
 
     Ok(user_affiliations)
+}
+
+pub async fn bulk_get_user_groups(
+    db: &DatabaseConnection,
+    user_ids: Vec<i32>,
+) -> Result<Vec<UserGroups>, DbErr> {
+    let user_groups: Vec<entity::auth_group_user::Model> = entity::prelude::AuthGroupUser::find()
+        .filter(entity::auth_group_user::Column::UserId.is_in(user_ids))
+        .all(db)
+        .await?;
+
+    let mut user_groups_map: HashMap<i32, UserGroups> = HashMap::new();
+
+    for user_group in user_groups {
+        user_groups_map
+            .entry(user_group.user_id)
+            .or_insert_with(|| UserGroups {
+                user_id: user_group.user_id,
+                groups: Vec::new(),
+            })
+            .groups
+            .push(user_group.group_id);
+    }
+
+    let user_groups: Vec<UserGroups> = user_groups_map.into_iter().map(|(_, v)| v).collect();
+
+    Ok(user_groups)
 }
 
 pub async fn update_user_main(

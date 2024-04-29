@@ -1,14 +1,33 @@
+use core::panic;
+use std::collections::HashSet;
+
+use eve_esi::character;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DbErr, DeleteResult,
     EntityTrait, QueryFilter,
 };
 
-use crate::auth::model::groups::{
-    GroupFilterGroupDto, GroupFilters, NewGroupDto, NewGroupFilterGroupDto, NewGroupFilterRuleDto,
-    UpdateGroupDto, UpdateGroupFilterGroupDto, UpdateGroupFilterRuleDto,
+use crate::{
+    auth::{
+        data::user::{
+            self, bulk_get_character_ownerships, bulk_get_user_affiliations, bulk_get_user_groups,
+        },
+        model::groups::{
+            GroupFilterCriteriaType, GroupFilterGroupDto, GroupFilterRuleDto, GroupFilters,
+            NewGroupDto, NewGroupFilterGroupDto, NewGroupFilterRuleDto, UpdateGroupDto,
+            UpdateGroupFilterGroupDto, UpdateGroupFilterRuleDto,
+        },
+    },
+    eve::data::{
+        alliance::bulk_get_alliances, character::bulk_get_character_affiliations,
+        corporation::bulk_get_corporations,
+    },
 };
 
-use entity::auth_group::Model as Group;
+use entity::{
+    auth_group::Model as Group,
+    sea_orm_active_enums::{GroupFilterCriteria, GroupFilterType},
+};
 
 pub async fn create_group(db: &DatabaseConnection, new_group: NewGroupDto) -> Result<Group, DbErr> {
     let group = entity::auth_group::ActiveModel {
@@ -144,6 +163,230 @@ pub async fn get_group_filters(
         }
         None => Ok(None),
     }
+}
+
+// Returns vec of character_ids added to the group
+pub async fn update_membership(
+    db: &DatabaseConnection,
+    group_id: i32,
+    user_ids: Vec<i32>,
+) -> Result<(), DbErr> {
+    async fn check_filters(
+        db: &DatabaseConnection,
+        rules: Vec<GroupFilterRuleDto>,
+        filter_type: GroupFilterType,
+        user_ids: Vec<i32>,
+    ) -> Result<(), DbErr> {
+        fn handle_affiliation_check(
+            eligible_users: HashSet<i32>,
+            filter_type: &GroupFilterType,
+            filter: &GroupFilterRuleDto,
+            ids_to_check: &Vec<i32>,
+            criteria_id: i32,
+            user_id: i32,
+        ) -> HashSet<i32> {
+            let mut eligible_users = eligible_users;
+
+            match filter.criteria_type {
+                GroupFilterCriteriaType::Is => {
+                    if *filter_type == GroupFilterType::Any && ids_to_check.contains(&criteria_id) {
+                        eligible_users.insert(user_id);
+                    } else if *filter_type == GroupFilterType::All
+                        && !ids_to_check.contains(&criteria_id)
+                    {
+                        eligible_users.remove(&user_id);
+                    }
+                }
+                GroupFilterCriteriaType::IsNot => {
+                    if *filter_type == GroupFilterType::Any && !ids_to_check.contains(&criteria_id)
+                    {
+                        eligible_users.insert(user_id);
+                    } else if *filter_type == GroupFilterType::All
+                        && ids_to_check.contains(&criteria_id)
+                    {
+                        eligible_users.remove(&user_id);
+                    }
+                }
+                _ => {
+                    panic!("Filter rule saved incorrectly, invalid criteria type inserted for filter rule {}", filter.id);
+                }
+            }
+
+            eligible_users
+        }
+
+        let mut eligible_users: HashSet<i32> = HashSet::new();
+
+        let mut user_affiliation = vec![];
+        let mut user_groups = vec![];
+
+        if filter_type == GroupFilterType::All {
+            eligible_users.extend(user_ids.clone());
+        }
+
+        for filter in rules {
+            match filter.criteria.into() {
+                GroupFilterCriteria::Group => {
+                    if user_groups.is_empty() {
+                        user_groups = bulk_get_user_groups(db, user_ids.clone()).await?;
+                    }
+
+                    let group_id: i32 = filter.criteria_value.parse::<i32>().expect(&format!(
+                        "Filter rule saved incorrectly, invalid criteria value insterted for filter rule {}",
+                        filter.id
+                    ));
+
+                    for user_group in user_groups.iter() {
+                        eligible_users = handle_affiliation_check(
+                            eligible_users,
+                            &filter_type,
+                            &filter,
+                            &user_group.groups,
+                            group_id,
+                            user_group.user_id,
+                        );
+                    }
+                }
+                GroupFilterCriteria::Corporation => {
+                    if user_affiliation.is_empty() {
+                        user_affiliation = bulk_get_user_affiliations(db, user_ids.clone()).await?;
+                    }
+
+                    let corporation_id = filter.criteria_value.parse::<i32>().expect(&format!(
+                        "Filter rule saved incorrectly, invalid criteria value insterted for filter rule {}",
+                        filter.id
+                    ));
+
+                    for affiliation in user_affiliation.iter() {
+                        eligible_users = handle_affiliation_check(
+                            eligible_users,
+                            &filter_type,
+                            &filter,
+                            &affiliation.corporations,
+                            corporation_id,
+                            affiliation.user_id,
+                        );
+                    }
+                }
+                GroupFilterCriteria::Alliance => {
+                    if user_affiliation.is_empty() {
+                        user_affiliation = bulk_get_user_affiliations(db, user_ids.clone()).await?;
+                    }
+
+                    let alliance_id = filter.criteria_value.parse::<i32>().expect(&format!(
+                        "Filter rule saved incorrectly, invalid criteria value insterted for filter rule {}",
+                        filter.id
+                    ));
+
+                    for affiliation in user_affiliation.iter() {
+                        eligible_users = handle_affiliation_check(
+                            eligible_users,
+                            &filter_type,
+                            &filter,
+                            &affiliation.alliances,
+                            alliance_id,
+                            affiliation.user_id,
+                        );
+                    }
+                }
+                GroupFilterCriteria::Role => {
+                    if user_affiliation.is_empty() {
+                        user_affiliation = bulk_get_user_affiliations(db, user_ids.clone()).await?;
+                    }
+
+                    let corporation_ids = user_affiliation
+                        .iter()
+                        .flat_map(|affiliation| affiliation.corporations.clone())
+                        .collect::<Vec<i32>>();
+
+                    let ceo_ids = bulk_get_corporations(db, corporation_ids.clone())
+                        .await?
+                        .iter()
+                        .map(|corporation| corporation.ceo)
+                        .collect::<Vec<i32>>();
+
+                    let mut executor_ids = vec![];
+
+                    for affiliation in user_affiliation.iter() {
+                        if filter.criteria_value == "CEO" {
+                            if filter_type == GroupFilterType::Any
+                                && affiliation.characters.iter().any(|id| ceo_ids.contains(id))
+                            {
+                                eligible_users.insert(affiliation.user_id);
+                            } else if filter_type == GroupFilterType::All {
+                                eligible_users.remove(&affiliation.user_id);
+                            }
+                        } else if filter.criteria_value == "Executor" {
+                            if executor_ids.is_empty() {
+                                executor_ids = bulk_get_alliances(db, corporation_ids.clone())
+                                    .await?
+                                    .iter()
+                                    .filter_map(|alliance: &entity::eve_alliance::Model| {
+                                        alliance.executor
+                                    })
+                                    .collect::<Vec<i32>>();
+                            }
+
+                            match filter.criteria_type {
+                                GroupFilterCriteriaType::Is => {
+                                    if filter_type == GroupFilterType::Any
+                                        && affiliation
+                                            .characters
+                                            .iter()
+                                            .any(|id| executor_ids.contains(id))
+                                    {
+                                        eligible_users.insert(affiliation.user_id);
+                                    } else if filter_type == GroupFilterType::All
+                                        && !affiliation
+                                            .characters
+                                            .iter()
+                                            .any(|id| executor_ids.contains(id))
+                                    {
+                                        eligible_users.remove(&affiliation.user_id);
+                                    }
+                                }
+                                GroupFilterCriteriaType::IsNot => {
+                                    if filter_type == GroupFilterType::Any
+                                        && !affiliation
+                                            .characters
+                                            .iter()
+                                            .any(|id| executor_ids.contains(id))
+                                    {
+                                        eligible_users.insert(affiliation.user_id);
+                                    } else if filter_type == GroupFilterType::All
+                                        && affiliation
+                                            .characters
+                                            .iter()
+                                            .any(|id| executor_ids.contains(id))
+                                    {
+                                        eligible_users.remove(&affiliation.user_id);
+                                    }
+                                }
+                                _ => {
+                                    panic!("Filter rule saved incorrectly, invalid criteria type inserted for filter rule {}", filter.id);
+                                }
+                            }
+                        } else {
+                            panic!("Filter rule saved incorrectly, invalid criteria value insterted for filter rule {}", filter.id);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Group
+        // Corporation
+        // Alliance
+
+        Ok(())
+    }
+
+    let filters = get_group_filters(db, group_id).await?;
+
+    // Check rules
+    // Check filter group rules
+
+    Ok(())
 }
 
 pub async fn update_group(
