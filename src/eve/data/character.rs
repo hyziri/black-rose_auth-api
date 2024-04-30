@@ -1,5 +1,5 @@
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
+    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set,
 };
 use std::collections::HashSet;
 
@@ -32,9 +32,10 @@ pub async fn create_character(
                 eve_esi::character::get_character_affiliations(vec![character_id]).await?;
 
             let character = entity::eve_character::ActiveModel {
-                character_id: ActiveValue::Set(character_id),
-                character_name: ActiveValue::Set(character_name),
-                corporation_id: ActiveValue::Set(affiliation[0].corporation_id),
+                character_id: Set(character_id),
+                character_name: Set(character_name),
+                corporation_id: Set(affiliation[0].corporation_id),
+                last_updated: Set(chrono::Utc::now().naive_utc()),
                 ..Default::default()
             };
 

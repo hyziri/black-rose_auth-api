@@ -1,5 +1,5 @@
 [package]
-name = "black-rose_auth-api"
+name = "black_rose_auth_api"
 version = "0.1.0"
 edition = "2021"
 
@@ -14,7 +14,7 @@ eve_oauth2 = "0.2.0"
 dotenv = "0.15.0"
 migration = { path = "migration" } 
 entity = { path = "entity" } 
-sea-orm = { version = "0.12", features = [ "sqlx-postgres", "runtime-tokio-rustls", "macros", "with-chrono" ] }
+sea-orm = { version = "0.12.2", features = [ "sqlx-postgres", "runtime-tokio-rustls", "macros", "with-chrono", "sqlx-sqlite" ] }
 redis = "0.25.3"
 rand = "0.8.5"
 chrono = "0.4.34"

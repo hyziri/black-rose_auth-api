@@ -1,3 +1,4 @@
+use chrono::Utc;
 use sea_orm::DbErr;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
@@ -12,6 +13,8 @@ use crate::eve::data::character::bulk_get_character_affiliations;
 
 pub async fn create_user(db: &DatabaseConnection) -> Result<i32, DbErr> {
     let user = entity::auth_user::ActiveModel {
+        admin: Set(false),
+        created: Set(Utc::now().naive_utc()),
         ..Default::default()
     };
 

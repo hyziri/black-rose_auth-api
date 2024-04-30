@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use axum::extract::Path;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
@@ -13,9 +12,7 @@ use sea_orm::DatabaseConnection;
 use tower_sessions::Session;
 
 use crate::auth::data;
-use crate::auth::model::groups::{
-    GroupDto, GroupFilterCriteria, NewGroupDto, NewGroupFilterRuleDto, UpdateGroupDto,
-};
+use crate::auth::model::groups::{GroupDto, NewGroupDto, UpdateGroupDto};
 
 pub fn group_routes() -> Router {
     Router::new()
@@ -57,91 +54,6 @@ async fn require_permissions(db: &DatabaseConnection, session: Session) -> Resul
     Err((StatusCode::FORBIDDEN, "Insufficient permissions").into_response())
 }
 
-async fn validate_filter_rules(
-    db: &DatabaseConnection,
-    rules: &Vec<NewGroupFilterRuleDto>,
-) -> Result<(), anyhow::Error> {
-    for rule in rules {
-        match rule.criteria {
-            GroupFilterCriteria::Group => {
-                use crate::auth::data::groups::get_group_by_id;
-
-                let group_id: i32 = match rule.criteria_value.parse::<i32>() {
-                    Ok(id) => id,
-                    Err(_) => return Err(anyhow!("Invalid group id: {}", rule.criteria_value)),
-                };
-
-                match get_group_by_id(db, group_id).await? {
-                    Some(_) => (),
-                    None => return Err(anyhow!("Group not found: {}", group_id)),
-                }
-            }
-            GroupFilterCriteria::Corporation => {
-                use crate::eve::data::corporation::create_corporation;
-
-                let corporation_id: i32 = match rule.criteria_value.parse::<i32>() {
-                    Ok(id) => id,
-                    Err(_) => {
-                        return Err(anyhow!("Invalid corporation id: {}", rule.criteria_value))
-                    }
-                };
-
-                match create_corporation(db, corporation_id).await {
-                    Ok(_) => (),
-                    Err(err) => {
-                        if err.is::<reqwest::Error>() {
-                            return Err(anyhow!("Corporation not found: {}", rule.criteria_value));
-                        }
-
-                        return Err(err);
-                    }
-                };
-            }
-            GroupFilterCriteria::Alliance => {
-                use crate::eve::data::alliance::create_alliance;
-
-                let alliance_id: i32 = match rule.criteria_value.parse::<i32>() {
-                    Ok(id) => id,
-                    Err(_) => return Err(anyhow!("Invalid alliance id: {}", rule.criteria_value)),
-                };
-
-                match create_alliance(db, alliance_id).await {
-                    Ok(_) => (),
-                    Err(err) => {
-                        if err.is::<reqwest::Error>() {
-                            return Err(anyhow!("Alliance not found: {}", rule.criteria_value));
-                        }
-
-                        return Err(err);
-                    }
-                };
-            }
-            GroupFilterCriteria::Role => {
-                if rule.criteria_value != "CEO" && rule.criteria_value != "Alliance Executor" {
-                    return Err(anyhow!(
-                        "Role must be set to either CEO or Alliance Executor"
-                    ));
-                }
-            }
-        }
-    }
-
-    Ok(())
-}
-
-async fn validate_group_filters(
-    db: &DatabaseConnection,
-    group: &NewGroupDto,
-) -> Result<(), anyhow::Error> {
-    validate_filter_rules(db, &group.filter_rules).await?;
-
-    for filter_group in &group.filter_groups {
-        validate_filter_rules(db, &filter_group.rules).await?;
-    }
-
-    Ok(())
-}
-
 #[utoipa::path(
     post,
     path = "/groups",
@@ -165,7 +77,7 @@ pub async fn create_group(
         Err(response) => return response,
     };
 
-    match validate_group_filters(&db, &payload).await {
+    match data::groups::validate_group_filters(&db, &payload).await {
         Ok(_) => (),
         Err(err) => {
             if err.is::<sea_orm::DbErr>() {
@@ -301,19 +213,6 @@ pub async fn get_group_filters(
     }
 }
 
-pub async fn join_group(
-    Extension(db): Extension<DatabaseConnection>,
-    session: Session,
-    Path(id): Path<(i32,)>,
-) -> Response {
-    match require_permissions(&db, session).await {
-        Ok(_) => (),
-        Err(response) => return response,
-    };
-
-    // data join group function
-}
-
 #[utoipa::path(
     put,
     path = "/groups/{id}",
@@ -338,7 +237,7 @@ pub async fn update_group(
         Err(response) => return response,
     };
 
-    match validate_group_filters(&db, &payload.clone().into()).await {
+    match data::groups::validate_group_filters(&db, &payload.clone().into()).await {
         Ok(_) => (),
         Err(err) => {
             if err.is::<sea_orm::DbErr>() {

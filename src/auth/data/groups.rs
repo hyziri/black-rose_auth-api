@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use core::panic;
 use std::collections::HashSet;
 
@@ -23,6 +24,91 @@ use crate::{
 };
 
 use entity::auth_group::Model as Group;
+
+pub async fn validate_filter_rules(
+    db: &DatabaseConnection,
+    rules: &Vec<NewGroupFilterRuleDto>,
+) -> Result<(), anyhow::Error> {
+    for rule in rules {
+        match rule.criteria {
+            GroupFilterCriteria::Group => {
+                use crate::auth::data::groups::get_group_by_id;
+
+                let group_id: i32 = match rule.criteria_value.parse::<i32>() {
+                    Ok(id) => id,
+                    Err(_) => return Err(anyhow!("Invalid group id: {}", rule.criteria_value)),
+                };
+
+                match get_group_by_id(db, group_id).await? {
+                    Some(_) => (),
+                    None => return Err(anyhow!("Group not found: {}", group_id)),
+                }
+            }
+            GroupFilterCriteria::Corporation => {
+                use crate::eve::data::corporation::create_corporation;
+
+                let corporation_id: i32 = match rule.criteria_value.parse::<i32>() {
+                    Ok(id) => id,
+                    Err(_) => {
+                        return Err(anyhow!("Invalid corporation id: {}", rule.criteria_value))
+                    }
+                };
+
+                match create_corporation(db, corporation_id).await {
+                    Ok(_) => (),
+                    Err(err) => {
+                        if err.is::<reqwest::Error>() {
+                            return Err(anyhow!("Corporation not found: {}", rule.criteria_value));
+                        }
+
+                        return Err(err);
+                    }
+                };
+            }
+            GroupFilterCriteria::Alliance => {
+                use crate::eve::data::alliance::create_alliance;
+
+                let alliance_id: i32 = match rule.criteria_value.parse::<i32>() {
+                    Ok(id) => id,
+                    Err(_) => return Err(anyhow!("Invalid alliance id: {}", rule.criteria_value)),
+                };
+
+                match create_alliance(db, alliance_id).await {
+                    Ok(_) => (),
+                    Err(err) => {
+                        if err.is::<reqwest::Error>() {
+                            return Err(anyhow!("Alliance not found: {}", rule.criteria_value));
+                        }
+
+                        return Err(err);
+                    }
+                };
+            }
+            GroupFilterCriteria::Role => {
+                if rule.criteria_value != "CEO" && rule.criteria_value != "Alliance Executor" {
+                    return Err(anyhow!(
+                        "Role must be set to either CEO or Alliance Executor"
+                    ));
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+pub async fn validate_group_filters(
+    db: &DatabaseConnection,
+    group: &NewGroupDto,
+) -> Result<(), anyhow::Error> {
+    validate_filter_rules(db, &group.filter_rules).await?;
+
+    for filter_group in &group.filter_groups {
+        validate_filter_rules(db, &filter_group.rules).await?;
+    }
+
+    Ok(())
+}
 
 pub async fn create_group(db: &DatabaseConnection, new_group: NewGroupDto) -> Result<Group, DbErr> {
     let group = entity::auth_group::ActiveModel {
@@ -368,7 +454,7 @@ pub async fn update_group_members(
         None => result[0].clone().into_iter().collect::<Vec<i32>>(),
     };
 
-    let models: Vec<_> = new_members
+    let models: Vec<entity::auth_group_user::ActiveModel> = new_members
         .clone()
         .into_iter()
         .map(|user_id| entity::auth_group_user::ActiveModel {
@@ -378,9 +464,9 @@ pub async fn update_group_members(
         })
         .collect();
 
-    entity::prelude::AuthGroupUser::insert_many(models)
-        .exec(db)
-        .await?;
+    for group in models {
+        group.insert(db).await?;
+    }
 
     Ok(new_members)
 }
