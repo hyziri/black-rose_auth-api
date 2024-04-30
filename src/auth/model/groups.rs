@@ -34,7 +34,7 @@ impl From<entity::sea_orm_active_enums::GroupType> for GroupType {
     }
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Clone)]
+#[derive(Serialize, Deserialize, ToSchema, Clone, PartialEq)]
 pub enum GroupFilterType {
     All,
     Any,

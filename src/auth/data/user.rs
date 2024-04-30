@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use entity::auth_user::Model as User;
 use entity::auth_user_character_ownership::Model as UserCharacterOwnership;
 
-use crate::auth::model::user::{UserAffiliation, UserGroups};
+use crate::auth::model::user::{UserAffiliations, UserGroups};
 use crate::eve::data::character::bulk_get_character_affiliations;
 
 pub async fn create_user(db: &DatabaseConnection) -> Result<i32, DbErr> {
@@ -150,12 +150,12 @@ pub async fn get_user_character_ownership_by_ownerhash(
 pub async fn bulk_get_user_affiliations(
     db: &DatabaseConnection,
     user_ids: Vec<i32>,
-) -> Result<Vec<UserAffiliation>, DbErr> {
+) -> Result<Vec<UserAffiliations>, DbErr> {
     let ownerships = bulk_get_character_ownerships(db, user_ids).await?;
     let character_ids: Vec<i32> = ownerships.iter().map(|char| char.character_id).collect();
     let affiliations = bulk_get_character_affiliations(db, character_ids.clone()).await?;
 
-    let mut user_affiliations: HashMap<i32, UserAffiliation> = HashMap::new();
+    let mut user_affiliations: HashMap<i32, UserAffiliations> = HashMap::new();
     let ownerships_map: HashMap<i32, &entity::auth_user_character_ownership::Model> = ownerships
         .iter()
         .map(|ownership| (ownership.character_id, ownership))
@@ -164,7 +164,7 @@ pub async fn bulk_get_user_affiliations(
     for ownership in &ownerships {
         user_affiliations
             .entry(ownership.user_id)
-            .or_insert(UserAffiliation {
+            .or_insert(UserAffiliations {
                 user_id: ownership.user_id,
                 characters: Vec::new(),
                 corporations: Vec::new(),

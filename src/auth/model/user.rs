@@ -8,7 +8,7 @@ pub struct UserDto {
     pub character_name: String,
 }
 
-pub struct UserAffiliation {
+pub struct UserAffiliations {
     pub user_id: i32,
     pub characters: Vec<i32>,
     pub corporations: Vec<i32>,
