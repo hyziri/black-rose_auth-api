@@ -79,15 +79,15 @@ async fn join_group() -> Result<(), anyhow::Error> {
             filter_groups: vec![],
         },
         NewGroupDto {
-            name: "Black Rose. group".to_string(),
-            description: Some("Open group requires you to be in Black Rose to join".to_string()),
+            name: "Alliance Executor Group".to_string(),
+            description: Some("Must be alliance executor to join".to_string()),
             confidential: false,
             group_type: GroupType::Open,
             filter_type: GroupFilterType::All,
             filter_rules: vec![NewGroupFilterRuleDto {
                 criteria: GroupFilterCriteria::Role,
                 criteria_type: GroupFilterCriteriaType::Is,
-                criteria_value: "Executor".to_string(),
+                criteria_value: "CEO".to_string(),
             }],
             filter_groups: vec![],
         },

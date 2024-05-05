@@ -278,11 +278,6 @@ pub async fn update_group_members(
     let filters = get_group_filters(db, group_id).await?;
 
     let mut result: Vec<HashSet<i32>> = vec![];
-
-    if filters.is_none() {
-        result.push(user_ids.clone().into_iter().collect());
-    };
-
     struct RuleSet {
         filter_type: GroupFilterType,
         rules: Vec<GroupFilterRuleDto>,
@@ -291,6 +286,10 @@ pub async fn update_group_members(
     let mut filter_groups: Vec<RuleSet> = vec![];
 
     if let Some(ref filters) = filters {
+        if filters.filter_rules.is_empty() && filters.filter_groups.is_empty() {
+            result.push(user_ids.clone().into_iter().collect());
+        }
+
         filter_groups = filters
             .filter_groups
             .iter()
@@ -304,13 +303,15 @@ pub async fn update_group_members(
             filter_type: filters.filter_type.clone(),
             rules: filters.filter_rules.clone(),
         });
+    } else {
+        // No group found, return an error
     }
 
     let mut user_affiliation: Vec<UserAffiliations> = vec![];
     let mut user_groups: Vec<UserGroups> = vec![];
-    let mut ceo_ids: Vec<i32> = vec![];
-    let mut executor_ids: Vec<i32> = vec![];
     let mut corporation_ids: Vec<i32> = vec![];
+    let mut corporations  = vec![];
+    let mut executor_ids: Vec<i32> = vec![];
 
     for group in filter_groups {
         let mut eligible_users: HashSet<i32> = HashSet::new();
@@ -378,19 +379,23 @@ pub async fn update_group_members(
                             .collect();
                     }
 
-                    let leadership_ids = match filter.criteria_value.as_str() {
+                    let leadership_ids: Vec<i32> = match filter.criteria_value.as_str() {
                         "CEO" => {
-                            if ceo_ids.is_empty() {
-                                ceo_ids = bulk_get_corporations(db, corporation_ids.clone())
-                                    .await?
-                                    .iter()
-                                    .map(|corporation| corporation.ceo)
-                                    .collect();
+                            if corporations.is_empty() {
+                                corporations = bulk_get_corporations(db, corporation_ids.clone())
+                                    .await?;
                             }
 
-                            ceo_ids.clone()
+                            corporations.clone().iter()
+                            .map(|corporation| corporation.ceo)
+                            .collect()
                         }
                         "Executor" => {
+                            if corporations.is_empty() {
+                                corporations = bulk_get_corporations(db, corporation_ids.clone())
+                                    .await?;
+                            }
+                            
                             if executor_ids.is_empty() {
                                 executor_ids = bulk_get_alliances(db, corporation_ids.clone())
                                     .await?
@@ -401,7 +406,11 @@ pub async fn update_group_members(
                                     .collect::<Vec<i32>>();
                             }
 
-                            executor_ids.clone()
+                            corporations
+                            .iter()
+                            .filter(|corp| executor_ids.contains(&corp.corporation_id))
+                            .map(|corp| corp.ceo)
+                            .collect::<Vec<i32>>()
                         }
                         _ => panic!("{}", format!("Filter rule saved incorrectly, invalid criteria value insterted for filter rule {}", filter.id))
                     };
