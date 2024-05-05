@@ -189,7 +189,7 @@ pub async fn bulk_get_user_affiliations(
         }
     }
 
-    let user_affiliations = user_affiliations.into_iter().map(|(_, v)| v).collect();
+    let user_affiliations = user_affiliations.into_values().collect();
 
     Ok(user_affiliations)
 }
@@ -216,7 +216,7 @@ pub async fn bulk_get_user_groups(
             .push(user_group.group_id);
     }
 
-    let user_groups: Vec<UserGroups> = user_groups_map.into_iter().map(|(_, v)| v).collect();
+    let user_groups: Vec<UserGroups> = user_groups_map.into_values().collect();
 
     Ok(user_groups)
 }

@@ -327,10 +327,8 @@ pub async fn update_group_members(
                         user_groups = bulk_get_user_groups(db, user_ids.clone()).await?;
                     }
 
-                    let group_id: i32 = filter.criteria_value.parse::<i32>().expect(&format!(
-                        "Filter rule saved incorrectly, invalid criteria value insterted for filter rule {}",
-                        filter.id
-                    ));
+                    let group_id: i32 = filter.criteria_value.parse::<i32>().unwrap_or_else(|_| panic!("Filter rule saved incorrectly, invalid criteria value insterted for filter rule {}",
+                        filter.id));
 
                     user_groups
                         .iter()
@@ -342,10 +340,8 @@ pub async fn update_group_members(
                         user_affiliation = bulk_get_user_affiliations(db, user_ids.clone()).await?;
                     }
 
-                    let corporation_id = filter.criteria_value.parse::<i32>().expect(&format!(
-                        "Filter rule saved incorrectly, invalid criteria value insterted for filter rule {}",
-                        filter.id
-                    ));
+                    let corporation_id = filter.criteria_value.parse::<i32>().unwrap_or_else(|_| panic!("Filter rule saved incorrectly, invalid criteria value insterted for filter rule {}",
+                        filter.id));
 
                     user_affiliation
                         .iter()
@@ -357,10 +353,8 @@ pub async fn update_group_members(
                         user_affiliation = bulk_get_user_affiliations(db, user_ids.clone()).await?;
                     }
 
-                    let alliance_id = filter.criteria_value.parse::<i32>().expect(&format!(
-                        "Filter rule saved incorrectly, invalid criteria value insterted for filter rule {}",
-                        filter.id
-                    ));
+                    let alliance_id = filter.criteria_value.parse::<i32>().unwrap_or_else(|_| panic!("Filter rule saved incorrectly, invalid criteria value insterted for filter rule {}",
+                        filter.id));
 
                     user_affiliation
                         .iter()
