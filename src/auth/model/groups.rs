@@ -96,7 +96,7 @@ impl From<entity::sea_orm_active_enums::GroupFilterCriteria> for GroupFilterCrit
     }
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Clone)]
+#[derive(Serialize, Deserialize, ToSchema, Clone, PartialEq)]
 pub enum GroupFilterCriteriaType {
     Is,
     IsNot,

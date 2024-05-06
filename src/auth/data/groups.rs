@@ -34,6 +34,14 @@ pub async fn validate_filter_rules(
             GroupFilterCriteria::Group => {
                 use crate::auth::data::groups::get_group_by_id;
 
+                if rule.criteria_type != GroupFilterCriteriaType::Is
+                    && rule.criteria_type != GroupFilterCriteriaType::IsNot
+                {
+                    return Err(anyhow!(
+                        "Invalid criteria type for group filter, must be either 'is' or 'is not'"
+                    ));
+                };
+
                 let group_id: i32 = match rule.criteria_value.parse::<i32>() {
                     Ok(id) => id,
                     Err(_) => return Err(anyhow!("Invalid group id: {}", rule.criteria_value)),
@@ -46,6 +54,14 @@ pub async fn validate_filter_rules(
             }
             GroupFilterCriteria::Corporation => {
                 use crate::eve::data::corporation::create_corporation;
+
+                if rule.criteria_type != GroupFilterCriteriaType::Is
+                    && rule.criteria_type != GroupFilterCriteriaType::IsNot
+                {
+                    return Err(anyhow!(
+                        "Invalid criteria type for group filter, must be either 'is' or 'is not'"
+                    ));
+                };
 
                 let corporation_id: i32 = match rule.criteria_value.parse::<i32>() {
                     Ok(id) => id,
@@ -68,6 +84,14 @@ pub async fn validate_filter_rules(
             GroupFilterCriteria::Alliance => {
                 use crate::eve::data::alliance::create_alliance;
 
+                if rule.criteria_type != GroupFilterCriteriaType::Is
+                    && rule.criteria_type != GroupFilterCriteriaType::IsNot
+                {
+                    return Err(anyhow!(
+                        "Invalid criteria type for group filter, must be either 'is' or 'is not'"
+                    ));
+                };
+
                 let alliance_id: i32 = match rule.criteria_value.parse::<i32>() {
                     Ok(id) => id,
                     Err(_) => return Err(anyhow!("Invalid alliance id: {}", rule.criteria_value)),
@@ -85,6 +109,14 @@ pub async fn validate_filter_rules(
                 };
             }
             GroupFilterCriteria::Role => {
+                if rule.criteria_type != GroupFilterCriteriaType::Is
+                    && rule.criteria_type != GroupFilterCriteriaType::IsNot
+                {
+                    return Err(anyhow!(
+                        "Invalid criteria type for group filter, must be either 'is' or 'is not'"
+                    ));
+                };
+
                 if rule.criteria_value != "CEO" && rule.criteria_value != "Alliance Executor" {
                     return Err(anyhow!(
                         "Role must be set to either CEO or Alliance Executor"

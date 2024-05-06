@@ -1,3 +1,5 @@
+use std::env;
+
 use axum::Router;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -44,6 +46,9 @@ pub fn routes() -> Router {
         .nest("/groups", group_routes());
 
     if cfg!(debug_assertions) {
+        let backend_domain = env::var("BACKEND_DOMAIN").expect("BACKEND_DOMAIN must be set!");
+
+        println!("\nLogin at http://{}/auth/login", backend_domain);
         routes.merge(SwaggerUi::new("/docs").url("/openapi.json", ApiDoc::openapi()))
     } else {
         routes
