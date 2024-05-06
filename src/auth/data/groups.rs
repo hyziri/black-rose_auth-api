@@ -310,7 +310,7 @@ pub async fn update_group_members(
     let mut user_affiliation: Vec<UserAffiliations> = vec![];
     let mut user_groups: Vec<UserGroups> = vec![];
     let mut corporation_ids: Vec<i32> = vec![];
-    let mut corporations  = vec![];
+    let mut corporations = vec![];
     let mut executor_ids: Vec<i32> = vec![];
 
     for group in filter_groups {
@@ -373,38 +373,32 @@ pub async fn update_group_members(
                             .collect();
                     }
 
+                    if corporations.is_empty() {
+                        corporations = bulk_get_corporations(db, corporation_ids.clone()).await?;
+                    }
+
                     let leadership_ids: Vec<i32> = match filter.criteria_value.as_str() {
                         "CEO" => {
-                            if corporations.is_empty() {
-                                corporations = bulk_get_corporations(db, corporation_ids.clone())
-                                    .await?;
-                            }
-
-                            corporations.clone().iter()
+                            corporations.iter()
                             .map(|corporation| corporation.ceo)
                             .collect()
                         }
                         "Executor" => {
-                            if corporations.is_empty() {
-                                corporations = bulk_get_corporations(db, corporation_ids.clone())
-                                    .await?;
-                            }
-                            
                             if executor_ids.is_empty() {
-                                executor_ids = bulk_get_alliances(db, corporation_ids.clone())
-                                    .await?
-                                    .iter()
-                                    .filter_map(|alliance: &entity::eve_alliance::Model| {
-                                        alliance.executor
-                                    })
-                                    .collect::<Vec<i32>>();
+                                let alliance_ids = corporations.iter()
+                                    .filter_map(|corp| corp.alliance_id)
+                                    .collect();
+
+                                executor_ids = bulk_get_alliances(db, alliance_ids).await?.iter()
+                                    .filter_map(|alliance| alliance.executor)
+                                    .collect();
                             }
 
                             corporations
                             .iter()
                             .filter(|corp| executor_ids.contains(&corp.corporation_id))
                             .map(|corp| corp.ceo)
-                            .collect::<Vec<i32>>()
+                            .collect()
                         }
                         _ => panic!("{}", format!("Filter rule saved incorrectly, invalid criteria value insterted for filter rule {}", filter.id))
                     };
