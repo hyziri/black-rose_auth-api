@@ -181,7 +181,7 @@ pub async fn get_group_by_id(
     get,
     path = "/groups/{id}/filters",
     responses(
-        (status = 200, description = "Group filters", body = Vec<GroupFilterDto>),
+        (status = 200, description = "Group filters", body = Vec<GroupFiltersDto>),
         (status = 403, description = "Insufficient permissions", body = String),
         (status = 404, description = "Not found", body = String),
         (status = 500, description = "Internal server error", body = String)

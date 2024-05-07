@@ -162,7 +162,7 @@ impl From<entity::auth_group::Model> for GroupDto {
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
-pub struct GroupFilters {
+pub struct GroupFiltersDto {
     pub id: i32,
     pub filter_type: GroupFilterType,
     pub filter_rules: Vec<GroupFilterRuleDto>,

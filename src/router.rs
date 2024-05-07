@@ -6,7 +6,7 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::auth::model::{
     groups::{
-        GroupFilters, GroupDto, GroupFilterCriteria, GroupFilterCriteriaType, GroupFilterGroupDto,
+        GroupFiltersDto, GroupDto, GroupFilterCriteria, GroupFilterCriteriaType, GroupFilterGroupDto,
         GroupFilterRuleDto, GroupFilterType, GroupType, NewGroupDto, NewGroupFilterGroupDto,
         NewGroupFilterRuleDto, UpdateGroupDto, UpdateGroupFilterGroupDto, UpdateGroupFilterRuleDto,
     },
@@ -27,7 +27,7 @@ pub fn routes() -> Router {
         components(schemas(
             UserDto, CharacterAffiliationDto, 
             NewGroupDto, NewGroupFilterGroupDto, NewGroupFilterRuleDto,  
-            GroupFilters, GroupDto, GroupFilterRuleDto, GroupFilterGroupDto, 
+            GroupFiltersDto, GroupDto, GroupFilterRuleDto, GroupFilterGroupDto, 
             UpdateGroupDto, UpdateGroupFilterRuleDto, UpdateGroupFilterGroupDto,
             GroupType, GroupFilterType, GroupFilterCriteria, GroupFilterCriteriaType)),
         tags(

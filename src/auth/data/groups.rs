@@ -13,7 +13,7 @@ use crate::{
         model::{
             groups::{
                 GroupFilterCriteria, GroupFilterCriteriaType, GroupFilterGroupDto,
-                GroupFilterRuleDto, GroupFilterType, GroupFilters, NewGroupDto,
+                GroupFilterRuleDto, GroupFilterType, GroupFiltersDto, NewGroupDto,
                 NewGroupFilterGroupDto, NewGroupFilterRuleDto, UpdateGroupDto,
                 UpdateGroupFilterGroupDto, UpdateGroupFilterRuleDto,
             },
@@ -228,7 +228,7 @@ pub async fn get_group_by_id(db: &DatabaseConnection, id: i32) -> Result<Option<
 pub async fn get_group_filters(
     db: &DatabaseConnection,
     id: i32,
-) -> Result<Option<GroupFilters>, DbErr> {
+) -> Result<Option<GroupFiltersDto>, DbErr> {
     let group = entity::prelude::AuthGroup::find()
         .filter(entity::auth_group::Column::Id.eq(id))
         .one(db)
@@ -265,7 +265,7 @@ pub async fn get_group_filters(
                 groups.push(group)
             }
 
-            let result = GroupFilters {
+            let result = GroupFiltersDto {
                 id: group.id,
                 filter_type: group.filter_type.into(),
                 filter_rules: filter_rules.into_iter().map(|rule| rule.into()).collect(),
