@@ -22,7 +22,8 @@ pub fn routes() -> Router {
             auth::login, auth::logout,
             user::get_user, user::get_user_main_character, user::get_user_characters,
             groups::create_group, groups::get_groups, groups::get_group_by_id,
-            groups::get_group_filters, groups::update_group, groups::delete_group
+            groups::get_group_filters, groups::update_group, groups::delete_group,
+            groups::join_group
         ),
         components(schemas(
             UserDto, CharacterAffiliationDto, 
