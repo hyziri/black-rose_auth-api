@@ -1,6 +1,6 @@
 use crate::common::{create_tables, create_user};
 use black_rose_auth_api::auth::{
-    data::groups::{create_group, update_group_members},
+    data::groups::{add_group_members, create_group},
     model::groups::{
         GroupFilterCriteria, GroupFilterCriteriaType, GroupFilterType, GroupType, NewGroupDto,
         NewGroupFilterRuleDto,
@@ -48,7 +48,7 @@ async fn group_type_open() -> Result<(), anyhow::Error> {
     }
 
     for group_id in group_ids {
-        let result = update_group_members(&db, group_id, vec![user_id]).await?;
+        let result = add_group_members(&db, group_id, vec![user_id]).await?;
 
         assert_eq!(result.len(), 1);
     }
@@ -98,8 +98,8 @@ async fn filter_type_any() -> Result<(), anyhow::Error> {
 
     let group_id = create_group(&db, group).await?.id;
 
-    let accept_result = update_group_members(&db, group_id, vec![eligible_user_id]).await?;
-    let reject_result = update_group_members(&db, group_id, vec![ineligible_user_id]).await?;
+    let accept_result = add_group_members(&db, group_id, vec![eligible_user_id]).await?;
+    let reject_result = add_group_members(&db, group_id, vec![ineligible_user_id]).await?;
 
     assert_eq!(
         accept_result.len(),
@@ -160,8 +160,8 @@ async fn filter_type_all() -> Result<(), anyhow::Error> {
     };
 
     let group_id = create_group(&db, group).await?.id;
-    let accept_result = update_group_members(&db, group_id, vec![eligible_user_id]).await?;
-    let reject_result = update_group_members(&db, group_id, vec![ineligible_user_id]).await?;
+    let accept_result = add_group_members(&db, group_id, vec![eligible_user_id]).await?;
+    let reject_result = add_group_members(&db, group_id, vec![ineligible_user_id]).await?;
 
     assert_eq!(
         accept_result.len(),
@@ -197,8 +197,8 @@ async fn test_filter(group: NewGroupDto) -> Result<(), anyhow::Error> {
     .await?;
 
     let group_id = create_group(&db, group).await?.id;
-    let accept_result = update_group_members(&db, group_id, vec![eligible_user_id]).await?;
-    let reject_result = update_group_members(&db, group_id, vec![ineligible_user_id]).await?;
+    let accept_result = add_group_members(&db, group_id, vec![eligible_user_id]).await?;
+    let reject_result = add_group_members(&db, group_id, vec![ineligible_user_id]).await?;
 
     assert_eq!(
         accept_result.len(),
@@ -245,7 +245,7 @@ async fn group_filter() -> Result<(), anyhow::Error> {
     };
 
     let group_1_id = create_group(&db, group_1).await?.id;
-    let _ = update_group_members(&db, group_1_id, vec![eligible_user_id]).await?;
+    let _ = add_group_members(&db, group_1_id, vec![eligible_user_id]).await?;
 
     let group_2 = NewGroupDto {
         name: "No Requirements".to_string(),
@@ -262,8 +262,8 @@ async fn group_filter() -> Result<(), anyhow::Error> {
     };
 
     let group_2_id = create_group(&db, group_2).await?.id;
-    let accept_result = update_group_members(&db, group_2_id, vec![eligible_user_id]).await?;
-    let reject_result = update_group_members(&db, group_2_id, vec![ineligible_user_id]).await?;
+    let accept_result = add_group_members(&db, group_2_id, vec![eligible_user_id]).await?;
+    let reject_result = add_group_members(&db, group_2_id, vec![ineligible_user_id]).await?;
 
     assert_eq!(
         accept_result.len(),
@@ -364,7 +364,7 @@ async fn executor_filter() -> Result<(), anyhow::Error> {
     };
 
     let group_id = create_group(&db, group).await?.id;
-    let accept_result = update_group_members(&db, group_id, vec![eligible_user_id]).await?;
+    let accept_result = add_group_members(&db, group_id, vec![eligible_user_id]).await?;
 
     assert_eq!(
         accept_result.len(),

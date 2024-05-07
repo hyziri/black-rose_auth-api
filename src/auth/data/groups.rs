@@ -302,7 +302,7 @@ pub async fn update_group(
     Ok(updated_group)
 }
 
-pub async fn update_group_members(
+pub async fn add_group_members(
     db: &DatabaseConnection,
     group_id: i32,
     user_ids: Vec<i32>,
@@ -498,6 +498,20 @@ pub async fn update_group_members(
     }
 
     Ok(new_members)
+}
+
+pub async fn delete_group_members(
+    db: &DatabaseConnection,
+    group_id: i32,
+    user_ids: Vec<i32>,
+) -> Result<u64, DbErr> {
+    let result = entity::prelude::AuthGroupUser::delete_many()
+        .filter(entity::auth_group_user::Column::GroupId.eq(group_id))
+        .filter(entity::auth_group_user::Column::UserId.is_in(user_ids))
+        .exec(db)
+        .await?;
+
+    Ok(result.rows_affected)
 }
 
 pub async fn update_filter_groups(

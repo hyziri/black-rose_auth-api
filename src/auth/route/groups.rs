@@ -12,7 +12,7 @@ use sea_orm::DatabaseConnection;
 use tower_sessions::Session;
 
 use crate::auth::data;
-use crate::auth::data::groups::update_group_members;
+use crate::auth::data::groups::{add_group_members, delete_group_members};
 use crate::auth::model::groups::{GroupDto, NewGroupDto, UpdateGroupDto};
 
 pub fn group_routes() -> Router {
@@ -23,7 +23,8 @@ pub fn group_routes() -> Router {
         .route("/:id/filters", get(get_group_filters))
         .route("/:id", put(update_group))
         .route("/:id", delete(delete_group))
-        .route("/:id/join", get(join_group))
+        .route("/:id/join", post(join_group))
+        .route("/:id/leave", delete(leave_group))
 }
 
 async fn require_permissions(db: &DatabaseConnection, session: Session) -> Result<i32, Response> {
@@ -297,12 +298,11 @@ pub async fn delete_group(
 }
 
 #[utoipa::path(
-    get,
+    post,
     path = "/groups/{id}/join",
     responses(
         (status = 200, description = "Joined group successfully", body = GroupDto),
-        (status = 400, description = "Failed to join group, requirements not met", body = String),
-        (status = 403, description = "Insufficient permissions", body = String),
+        (status = 403, description = "Failed to join group, requirements not met", body = String),
         (status = 404, description = "Not found", body = String),
         (status = 500, description = "Internal server error", body = String)
     ),
@@ -320,7 +320,7 @@ pub async fn join_group(
         Err(response) => return response,
     };
 
-    match update_group_members(&db, id.0, vec![user_id]).await {
+    match add_group_members(&db, id.0, vec![user_id]).await {
         Ok(result) => {
             if result.is_empty() {
                 (
@@ -333,5 +333,44 @@ pub async fn join_group(
             }
         }
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error joining group").into_response(),
+    }
+}
+
+#[utoipa::path(
+    delete,
+    path = "/groups/{id}/leave",
+    responses(
+        (status = 200, description = "Left group successfully", body = GroupDto),
+        (status = 403, description = "Cannot leave a group you are not a member of", body = String),
+        (status = 404, description = "Not found", body = String),
+        (status = 500, description = "Internal server error", body = String)
+    ),
+    security(
+        ("login" = [])
+    )
+)]
+pub async fn leave_group(
+    Extension(db): Extension<DatabaseConnection>,
+    session: Session,
+    Path(id): Path<(i32,)>,
+) -> Response {
+    let user_id = match require_permissions(&db, session).await {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+
+    match delete_group_members(&db, id.0, vec![user_id]).await {
+        Ok(result) => {
+            if result == 0 {
+                (
+                    StatusCode::FORBIDDEN,
+                    "Cannot leave a group you are not a member of",
+                )
+                    .into_response()
+            } else {
+                (StatusCode::OK, "Left group successfully").into_response()
+            }
+        }
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error leaving group").into_response(),
     }
 }
