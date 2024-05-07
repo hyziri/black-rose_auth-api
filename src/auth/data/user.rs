@@ -221,6 +221,17 @@ pub async fn bulk_get_user_groups(
     Ok(user_groups)
 }
 
+pub async fn bulk_get_user_main_characters(
+    db: &DatabaseConnection,
+    user_ids: Vec<i32>,
+) -> Result<Vec<UserCharacterOwnership>, DbErr> {
+    entity::prelude::AuthUserCharacterOwnership::find()
+        .filter(entity::auth_user_character_ownership::Column::UserId.is_in(user_ids))
+        .filter(entity::auth_user_character_ownership::Column::Main.eq(true))
+        .all(db)
+        .await
+}
+
 pub async fn update_user_main(
     db: &DatabaseConnection,
     character_id: i32,

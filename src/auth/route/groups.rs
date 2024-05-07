@@ -21,6 +21,7 @@ pub fn group_routes() -> Router {
         .route("/", get(get_groups))
         .route("/:id", get(get_group_by_id))
         .route("/:id/filters", get(get_group_filters))
+        .route("/:id/members", get(get_group_members))
         .route("/:id", put(update_group))
         .route("/:id", delete(delete_group))
         .route("/:id/join", post(join_group))
@@ -113,6 +114,45 @@ pub async fn create_group(
 }
 
 #[utoipa::path(
+    post,
+    path = "/groups/{id}/join",
+    responses(
+        (status = 200, description = "Joined group successfully", body = GroupDto),
+        (status = 403, description = "Failed to join group, requirements not met", body = String),
+        (status = 404, description = "Not found", body = String),
+        (status = 500, description = "Internal server error", body = String)
+    ),
+    security(
+        ("login" = [])
+    )
+)]
+pub async fn join_group(
+    Extension(db): Extension<DatabaseConnection>,
+    session: Session,
+    Path(group_id): Path<(i32,)>,
+) -> Response {
+    let user_id = match require_permissions(&db, session).await {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+
+    match add_group_members(&db, group_id.0, vec![user_id]).await {
+        Ok(result) => {
+            if result.is_empty() {
+                (
+                    StatusCode::FORBIDDEN,
+                    "Failed to join group, requirements not met",
+                )
+                    .into_response()
+            } else {
+                (StatusCode::OK, "Joined group successfully").into_response()
+            }
+        }
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error joining group").into_response(),
+    }
+}
+
+#[utoipa::path(
     get,
     path = "/groups",
     responses(
@@ -160,14 +200,14 @@ pub async fn get_groups(
 pub async fn get_group_by_id(
     Extension(db): Extension<DatabaseConnection>,
     session: Session,
-    Path(id): Path<(i32,)>,
+    Path(group_id): Path<(i32,)>,
 ) -> Response {
     match require_permissions(&db, session).await {
         Ok(_) => (),
         Err(response) => return response,
     };
 
-    match data::groups::get_group_by_id(&db, id.0).await {
+    match data::groups::get_group_by_id(&db, group_id.0).await {
         Ok(group) => match group {
             Some(group) => {
                 let dto: GroupDto = group.into();
@@ -196,14 +236,14 @@ pub async fn get_group_by_id(
 pub async fn get_group_filters(
     Extension(db): Extension<DatabaseConnection>,
     session: Session,
-    Path(id): Path<(i32,)>,
+    Path(group_id): Path<(i32,)>,
 ) -> Response {
     match require_permissions(&db, session).await {
         Ok(_) => (),
         Err(response) => return response,
     };
 
-    match data::groups::get_group_filters(&db, id.0).await {
+    match data::groups::get_group_filters(&db, group_id.0).await {
         Ok(filters) => match filters {
             Some(filters) => (StatusCode::OK, Json(filters)).into_response(),
             None => (StatusCode::NOT_FOUND, "Group filters not found").into_response(),
@@ -211,6 +251,39 @@ pub async fn get_group_filters(
         Err(_) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             "Error getting group filters",
+        )
+            .into_response(),
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/groups/{id}/members",
+    responses(
+        (status = 200, description = "Group members", body = Vec<UserDto>),
+        (status = 403, description = "Insufficient permissions", body = String),
+        (status = 404, description = "Not found", body = String),
+        (status = 500, description = "Internal server error", body = String)
+    ),
+    security(
+        ("login" = [])
+    )
+)]
+pub async fn get_group_members(
+    Extension(db): Extension<DatabaseConnection>,
+    session: Session,
+    Path(group_id): Path<(i32,)>,
+) -> Response {
+    match require_permissions(&db, session).await {
+        Ok(_) => (),
+        Err(response) => return response,
+    };
+
+    match data::groups::get_group_members(&db, group_id.0).await {
+        Ok(members) => (StatusCode::OK, Json(members)).into_response(),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Error getting group members",
         )
             .into_response(),
     }
@@ -232,7 +305,7 @@ pub async fn get_group_filters(
 pub async fn update_group(
     Extension(db): Extension<DatabaseConnection>,
     session: Session,
-    Path(id): Path<(i32,)>,
+    Path(group_id): Path<(i32,)>,
     extract::Json(payload): extract::Json<UpdateGroupDto>,
 ) -> Response {
     match require_permissions(&db, session).await {
@@ -255,7 +328,7 @@ pub async fn update_group(
         }
     }
 
-    match data::groups::update_group(&db, id.0, payload).await {
+    match data::groups::update_group(&db, group_id.0, payload).await {
         Ok(group) => {
             let dto: GroupDto = group.into();
 
@@ -281,58 +354,19 @@ pub async fn update_group(
 pub async fn delete_group(
     Extension(db): Extension<DatabaseConnection>,
     session: Session,
-    Path(id): Path<(i32,)>,
+    Path(group_id): Path<(i32,)>,
 ) -> Response {
     match require_permissions(&db, session).await {
         Ok(_) => (),
         Err(response) => return response,
     };
 
-    match data::groups::delete_group(&db, id.0).await {
+    match data::groups::delete_group(&db, group_id.0).await {
         Ok(result) => match result {
             Some(id) => (StatusCode::OK, format!("Deleted group with id {}", id)).into_response(),
             None => (StatusCode::NOT_FOUND, "Group not found").into_response(),
         },
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error getting groups").into_response(),
-    }
-}
-
-#[utoipa::path(
-    post,
-    path = "/groups/{id}/join",
-    responses(
-        (status = 200, description = "Joined group successfully", body = GroupDto),
-        (status = 403, description = "Failed to join group, requirements not met", body = String),
-        (status = 404, description = "Not found", body = String),
-        (status = 500, description = "Internal server error", body = String)
-    ),
-    security(
-        ("login" = [])
-    )
-)]
-pub async fn join_group(
-    Extension(db): Extension<DatabaseConnection>,
-    session: Session,
-    Path(id): Path<(i32,)>,
-) -> Response {
-    let user_id = match require_permissions(&db, session).await {
-        Ok(user_id) => user_id,
-        Err(response) => return response,
-    };
-
-    match add_group_members(&db, id.0, vec![user_id]).await {
-        Ok(result) => {
-            if result.is_empty() {
-                (
-                    StatusCode::FORBIDDEN,
-                    "Failed to join group, requirements not met",
-                )
-                    .into_response()
-            } else {
-                (StatusCode::OK, "Joined group successfully").into_response()
-            }
-        }
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error joining group").into_response(),
     }
 }
 
@@ -352,14 +386,14 @@ pub async fn join_group(
 pub async fn leave_group(
     Extension(db): Extension<DatabaseConnection>,
     session: Session,
-    Path(id): Path<(i32,)>,
+    Path(group_id): Path<(i32,)>,
 ) -> Response {
     let user_id = match require_permissions(&db, session).await {
         Ok(user_id) => user_id,
         Err(response) => return response,
     };
 
-    match delete_group_members(&db, id.0, vec![user_id]).await {
+    match delete_group_members(&db, group_id.0, vec![user_id]).await {
         Ok(result) => {
             if result == 0 {
                 (

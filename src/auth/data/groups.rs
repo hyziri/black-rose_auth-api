@@ -17,13 +17,18 @@ use crate::{
                 NewGroupFilterGroupDto, NewGroupFilterRuleDto, UpdateGroupDto,
                 UpdateGroupFilterGroupDto, UpdateGroupFilterRuleDto,
             },
-            user::{UserAffiliations, UserGroups},
+            user::{UserAffiliations, UserDto, UserGroups},
         },
     },
-    eve::data::{alliance::bulk_get_alliances, corporation::bulk_get_corporations},
+    eve::data::{
+        alliance::bulk_get_alliances, character::bulk_get_characters,
+        corporation::bulk_get_corporations,
+    },
 };
 
 use entity::auth_group::Model as Group;
+
+use super::user::bulk_get_user_main_characters;
 
 pub async fn validate_filter_rules(
     db: &DatabaseConnection,
@@ -276,6 +281,46 @@ pub async fn get_group_filters(
         }
         None => Ok(None),
     }
+}
+
+pub async fn get_group_members(
+    db: &DatabaseConnection,
+    group_id: i32,
+) -> Result<Vec<UserDto>, sea_orm::DbErr> {
+    let members = entity::prelude::AuthGroupUser::find()
+        .filter(entity::auth_group_user::Column::GroupId.eq(group_id))
+        .all(db)
+        .await?;
+
+    let user_ids = members
+        .iter()
+        .map(|member| member.user_id)
+        .collect::<Vec<i32>>();
+
+    let ownerships = bulk_get_user_main_characters(db, user_ids).await?;
+    let character_ids = ownerships
+        .iter()
+        .map(|user| user.character_id)
+        .collect::<Vec<i32>>();
+
+    let characters = bulk_get_characters(db, character_ids).await?;
+
+    let characters = characters
+        .iter()
+        .filter_map(|character| {
+            ownerships
+                .iter()
+                .find(|&model| model.character_id == character.character_id)
+                .map(|model| model.user_id)
+                .map(|user_id| UserDto {
+                    id: user_id,
+                    character_name: character.character_name.clone(),
+                    character_id: character.character_id,
+                })
+        })
+        .collect::<Vec<UserDto>>();
+
+    Ok(characters)
 }
 
 pub async fn update_group(
