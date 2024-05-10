@@ -12,7 +12,6 @@ use sea_orm::DatabaseConnection;
 use tower_sessions::Session;
 
 use crate::auth::data;
-use crate::auth::data::groups::add_group_members;
 use crate::auth::model::groups::{GroupDto, NewGroupDto, UpdateGroupDto};
 
 pub fn group_routes() -> Router {
@@ -22,10 +21,10 @@ pub fn group_routes() -> Router {
         .route("/:id", get(get_group_by_id))
         .route("/:id/filters", get(get_group_filters))
         .route("/:id/members", get(get_group_members))
+        .route("/:id/members", post(add_group_members))
         .route("/:id/members", delete(delete_group_members))
         .route("/:id", put(update_group))
         .route("/:id", delete(delete_group))
-        .route("/:id/join", post(join_group))
 }
 
 async fn require_permissions(db: &DatabaseConnection, session: Session) -> Result<i32, Response> {
@@ -115,10 +114,10 @@ pub async fn create_group(
 
 #[utoipa::path(
     post,
-    path = "/groups/{id}/join",
+    path = "/groups/{id}/members",
     responses(
-        (status = 200, description = "Joined group successfully", body = GroupDto),
-        (status = 403, description = "Failed to join group, requirements not met", body = String),
+        (status = 200, description = "Users added successfully", body = GroupDto),
+        (status = 403, description = "Insufficient permissions", body = String),
         (status = 404, description = "Not found", body = String),
         (status = 500, description = "Internal server error", body = String)
     ),
@@ -126,29 +125,26 @@ pub async fn create_group(
         ("login" = [])
     )
 )]
-pub async fn join_group(
+pub async fn add_group_members(
     Extension(db): Extension<DatabaseConnection>,
     session: Session,
     Path(group_id): Path<(i32,)>,
+    user_ids: Json<Vec<i32>>,
 ) -> Response {
     let user_id = match require_permissions(&db, session).await {
         Ok(user_id) => user_id,
         Err(response) => return response,
     };
 
-    match add_group_members(&db, group_id.0, vec![user_id]).await {
-        Ok(result) => {
-            if result.is_empty() {
-                (
-                    StatusCode::FORBIDDEN,
-                    "Failed to join group, requirements not met",
-                )
-                    .into_response()
-            } else {
-                (StatusCode::OK, "Joined group successfully").into_response()
-            }
-        }
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error joining group").into_response(),
+    let user_ids = user_ids.to_vec();
+
+    if user_ids.len() == 1 && user_ids[0] != user_id {
+        // require permissions to add other users
+    }
+
+    match data::groups::add_group_members(&db, group_id.0, user_ids.to_vec()).await {
+        Ok(_) => (StatusCode::OK, "Users added successfully").into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error leaving group").into_response(),
     }
 }
 
