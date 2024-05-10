@@ -80,21 +80,6 @@ pub async fn create_group(
         Err(response) => return response,
     };
 
-    match data::groups::validate_group_filters(&db, &payload).await {
-        Ok(_) => (),
-        Err(err) => {
-            if err.is::<sea_orm::DbErr>() {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Error creating new group",
-                )
-                    .into_response();
-            }
-
-            return (StatusCode::BAD_REQUEST, err.to_string()).into_response();
-        }
-    }
-
     match data::groups::create_group(&db, payload).await {
         Ok(group) => {
             let dto: GroupDto = group.into();
@@ -102,12 +87,15 @@ pub async fn create_group(
             (StatusCode::OK, Json(dto)).into_response()
         }
         Err(err) => {
-            println!("{}", err);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Error creating new group",
-            )
-                .into_response()
+            if err.is::<sea_orm::error::DbErr>() {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Error creating new group",
+                )
+                    .into_response();
+            }
+
+            (StatusCode::BAD_REQUEST, err.to_string()).into_response()
         }
     }
 }
@@ -309,10 +297,14 @@ pub async fn update_group(
         Err(response) => return response,
     };
 
-    match data::groups::validate_group_filters(&db, &payload.clone().into()).await {
-        Ok(_) => (),
+    match data::groups::update_group(&db, group_id.0, payload).await {
+        Ok(group) => {
+            let dto: GroupDto = group.into();
+
+            (StatusCode::OK, Json(dto)).into_response()
+        }
         Err(err) => {
-            if err.is::<sea_orm::DbErr>() {
+            if err.is::<sea_orm::error::DbErr>() {
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "Error creating new group",
@@ -320,17 +312,8 @@ pub async fn update_group(
                     .into_response();
             }
 
-            return (StatusCode::BAD_REQUEST, err.to_string()).into_response();
+            (StatusCode::BAD_REQUEST, err.to_string()).into_response()
         }
-    }
-
-    match data::groups::update_group(&db, group_id.0, payload).await {
-        Ok(group) => {
-            let dto: GroupDto = group.into();
-
-            (StatusCode::OK, Json(dto)).into_response()
-        }
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error updating group").into_response(),
     }
 }
 

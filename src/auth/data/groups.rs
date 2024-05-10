@@ -122,10 +122,8 @@ pub async fn validate_filter_rules(
                     ));
                 };
 
-                if rule.criteria_value != "CEO" && rule.criteria_value != "Alliance Executor" {
-                    return Err(anyhow!(
-                        "Role must be set to either CEO or Alliance Executor"
-                    ));
+                if rule.criteria_value != "CEO" && rule.criteria_value != "Executor" {
+                    return Err(anyhow!("Role must be set to either CEO or Executor"));
                 }
             }
         }
@@ -147,7 +145,21 @@ pub async fn validate_group_filters(
     Ok(())
 }
 
-pub async fn create_group(db: &DatabaseConnection, new_group: NewGroupDto) -> Result<Group, DbErr> {
+pub async fn create_group(
+    db: &DatabaseConnection,
+    new_group: NewGroupDto,
+) -> Result<Group, anyhow::Error> {
+    match validate_group_filters(db, &new_group).await {
+        Ok(_) => (),
+        Err(err) => {
+            if err.is::<sea_orm::DbErr>() {
+                return Err(err);
+            }
+
+            return Err(err);
+        }
+    }
+
     let group = entity::auth_group::ActiveModel {
         name: Set(new_group.name),
         description: Set(new_group.description),
@@ -337,7 +349,18 @@ pub async fn update_group(
     db: &DatabaseConnection,
     id: i32,
     group: UpdateGroupDto,
-) -> Result<Group, DbErr> {
+) -> Result<Group, anyhow::Error> {
+    match validate_group_filters(db, &group.clone().into()).await {
+        Ok(_) => (),
+        Err(err) => {
+            if err.is::<sea_orm::DbErr>() {
+                return Err(err);
+            }
+
+            return Err(err);
+        }
+    }
+
     let updated_group = entity::auth_group::ActiveModel {
         id: Set(id),
         name: Set(group.name),
