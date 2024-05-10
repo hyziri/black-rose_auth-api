@@ -22,7 +22,7 @@ pub fn routes() -> Router {
             user::get_user_groups,
             groups::create_group, groups::get_groups, groups::get_group_by_id,
             groups::get_group_filters, groups::update_group, groups::delete_group,
-            groups::join_group, groups::leave_group, groups::get_group_members,
+            groups::join_group, groups::get_group_members, groups::delete_group_members
         ),
         components(schemas(
             UserDto, CharacterAffiliationDto, 

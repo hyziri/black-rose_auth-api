@@ -12,7 +12,7 @@ use sea_orm::DatabaseConnection;
 use tower_sessions::Session;
 
 use crate::auth::data;
-use crate::auth::data::groups::{add_group_members, delete_group_members};
+use crate::auth::data::groups::add_group_members;
 use crate::auth::model::groups::{GroupDto, NewGroupDto, UpdateGroupDto};
 
 pub fn group_routes() -> Router {
@@ -22,10 +22,10 @@ pub fn group_routes() -> Router {
         .route("/:id", get(get_group_by_id))
         .route("/:id/filters", get(get_group_filters))
         .route("/:id/members", get(get_group_members))
+        .route("/:id/members", delete(delete_group_members))
         .route("/:id", put(update_group))
         .route("/:id", delete(delete_group))
         .route("/:id/join", post(join_group))
-        .route("/:id/leave", delete(leave_group))
 }
 
 async fn require_permissions(db: &DatabaseConnection, session: Session) -> Result<i32, Response> {
@@ -372,10 +372,10 @@ pub async fn delete_group(
 
 #[utoipa::path(
     delete,
-    path = "/groups/{id}/leave",
+    path = "/groups/{id}/members",
     responses(
-        (status = 200, description = "Left group successfully", body = GroupDto),
-        (status = 403, description = "Cannot leave a group you are not a member of", body = String),
+        (status = 200, description = "Users removed successfully", body = GroupDto),
+        (status = 403, description = "Insufficient permissions", body = String),
         (status = 404, description = "Not found", body = String),
         (status = 500, description = "Internal server error", body = String)
     ),
@@ -383,28 +383,25 @@ pub async fn delete_group(
         ("login" = [])
     )
 )]
-pub async fn leave_group(
+pub async fn delete_group_members(
     Extension(db): Extension<DatabaseConnection>,
     session: Session,
     Path(group_id): Path<(i32,)>,
+    user_ids: Json<Vec<i32>>,
 ) -> Response {
     let user_id = match require_permissions(&db, session).await {
         Ok(user_id) => user_id,
         Err(response) => return response,
     };
 
-    match delete_group_members(&db, group_id.0, vec![user_id]).await {
-        Ok(result) => {
-            if result == 0 {
-                (
-                    StatusCode::FORBIDDEN,
-                    "Cannot leave a group you are not a member of",
-                )
-                    .into_response()
-            } else {
-                (StatusCode::OK, "Left group successfully").into_response()
-            }
-        }
+    let user_ids = user_ids.to_vec();
+
+    if user_ids.len() == 1 && user_ids[0] != user_id {
+        // require permissions to remove other users
+    }
+
+    match data::groups::delete_group_members(&db, group_id.0, user_ids.to_vec()).await {
+        Ok(_) => (StatusCode::OK, "Users removed successfully").into_response(),
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error leaving group").into_response(),
     }
 }
