@@ -138,7 +138,8 @@ pub async fn validate_group_filters(
     Ok(())
 }
 
-pub async fn add_group_members(
+// Checks a vec of user_ids against a group's filters and returns a vec of user_ids that are eligible to be in the group
+pub async fn validate_group_members(
     db: &DatabaseConnection,
     group_id: i32,
     user_ids: Vec<i32>,
@@ -151,7 +152,7 @@ pub async fn add_group_members(
         rules: Vec<GroupFilterRuleDto>,
     }
 
-    let mut filter_groups: Vec<RuleSet> = vec![];
+    let mut filter_groups = vec![];
 
     if let Some(ref filters) = filters {
         if filters.filter_rules.is_empty() && filters.filter_groups.is_empty() {
@@ -171,8 +172,6 @@ pub async fn add_group_members(
             filter_type: filters.filter_type.clone(),
             rules: filters.filter_rules.clone(),
         });
-    } else {
-        // No group found, return an error
     }
 
     let mut user_affiliation: Vec<UserAffiliations> = vec![];
@@ -305,37 +304,24 @@ pub async fn add_group_members(
         result.push(eligible_users);
     }
 
-    let new_members = match filters {
+    let eligible_users = match filters {
         Some(filters) => match filters.filter_type {
+            // If ALL filters are met add to new_members
             GroupFilterType::All => result.iter().skip(1).fold(result[0].clone(), |acc, set| {
                 acc.intersection(set).cloned().collect::<HashSet<i32>>()
             }),
+            // If ANY filters are met add to new_members
             GroupFilterType::Any => result.iter().skip(1).fold(result[0].clone(), |acc, set| {
                 acc.union(set).cloned().collect::<HashSet<i32>>()
             }),
         }
         .into_iter()
         .collect::<Vec<i32>>(),
+        // If no filters then add all users to new_members
         None => result[0].clone().into_iter().collect::<Vec<i32>>(),
     };
 
-    let models: Vec<entity::auth_group_user::ActiveModel> = new_members
-        .clone()
-        .into_iter()
-        .map(|user_id| entity::auth_group_user::ActiveModel {
-            group_id: Set(group_id),
-            user_id: Set(user_id),
-            ..Default::default()
-        })
-        .collect();
-
-    // GROUP TYPE
-
-    for group in models {
-        group.insert(db).await?;
-    }
-
-    Ok(new_members)
+    Ok(eligible_users)
 }
 
 pub async fn create_filter_groups(

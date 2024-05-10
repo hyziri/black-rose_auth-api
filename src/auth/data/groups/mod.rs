@@ -6,9 +6,12 @@ use sea_orm::{
 };
 
 use crate::{
-    auth::model::{
-        groups::{NewGroupDto, UpdateGroupDto},
-        user::UserDto,
+    auth::{
+        data::groups::filters::validate_group_members,
+        model::{
+            groups::{NewGroupDto, UpdateGroupDto},
+            user::UserDto,
+        },
     },
     eve::data::character::bulk_get_characters,
 };
@@ -152,6 +155,32 @@ pub async fn update_group(
     // Queue update group members task
 
     Ok(updated_group)
+}
+
+pub async fn add_group_members(
+    db: &DatabaseConnection,
+    group_id: i32,
+    user_ids: Vec<i32>,
+) -> Result<Vec<i32>, DbErr> {
+    // ensure group exists
+
+    let new_members = validate_group_members(db, group_id, user_ids).await?;
+
+    let models: Vec<entity::auth_group_user::ActiveModel> = new_members
+        .clone()
+        .into_iter()
+        .map(|user_id| entity::auth_group_user::ActiveModel {
+            group_id: Set(group_id),
+            user_id: Set(user_id),
+            ..Default::default()
+        })
+        .collect();
+
+    for group in models {
+        group.insert(db).await?;
+    }
+
+    Ok(new_members)
 }
 
 pub async fn delete_group_members(
