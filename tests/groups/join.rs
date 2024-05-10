@@ -1,6 +1,6 @@
 use crate::common::{create_tables, create_user};
 use black_rose_auth_api::auth::{
-    data::groups::{add_group_members, create_group},
+    data::groups::{create_group, filters::add_group_members},
     model::groups::{
         GroupFilterCriteria, GroupFilterCriteriaType, GroupFilterType, GroupType, NewGroupDto,
         NewGroupFilterRuleDto,

@@ -14,21 +14,14 @@ use crate::{
             groups::{
                 GroupFilterCriteria, GroupFilterCriteriaType, GroupFilterGroupDto,
                 GroupFilterRuleDto, GroupFilterType, GroupFiltersDto, NewGroupDto,
-                NewGroupFilterGroupDto, NewGroupFilterRuleDto, UpdateGroupDto,
-                UpdateGroupFilterGroupDto, UpdateGroupFilterRuleDto,
+                NewGroupFilterGroupDto, NewGroupFilterRuleDto, UpdateGroupFilterGroupDto,
+                UpdateGroupFilterRuleDto,
             },
-            user::{UserAffiliations, UserDto, UserGroups},
+            user::{UserAffiliations, UserGroups},
         },
     },
-    eve::data::{
-        alliance::bulk_get_alliances, character::bulk_get_characters,
-        corporation::bulk_get_corporations,
-    },
+    eve::data::{alliance::bulk_get_alliances, corporation::bulk_get_corporations},
 };
-
-use entity::auth_group::Model as Group;
-
-use super::user::bulk_get_user_main_characters;
 
 pub async fn validate_filter_rules(
     db: &DatabaseConnection,
@@ -143,241 +136,6 @@ pub async fn validate_group_filters(
     }
 
     Ok(())
-}
-
-pub async fn create_group(
-    db: &DatabaseConnection,
-    new_group: NewGroupDto,
-) -> Result<Group, anyhow::Error> {
-    match validate_group_filters(db, &new_group).await {
-        Ok(_) => (),
-        Err(err) => {
-            if err.is::<sea_orm::DbErr>() {
-                return Err(err);
-            }
-
-            return Err(err);
-        }
-    }
-
-    let group = entity::auth_group::ActiveModel {
-        name: Set(new_group.name),
-        description: Set(new_group.description),
-        confidential: Set(new_group.confidential),
-        group_type: Set(new_group.group_type.into()),
-        filter_type: Set(new_group.filter_type.into()),
-        ..Default::default()
-    };
-
-    let group = group.insert(db).await?;
-
-    create_filter_groups(db, group.id, new_group.filter_groups).await?;
-    bulk_create_filter_rules(db, group.id, None, new_group.filter_rules).await?;
-
-    // Queue update group members task
-
-    Ok(group)
-}
-
-pub async fn create_filter_groups(
-    db: &DatabaseConnection,
-    group_id: i32,
-    filter_groups: Vec<NewGroupFilterGroupDto>,
-) -> Result<(), DbErr> {
-    for group in filter_groups {
-        let new_group = entity::auth_group_filter_group::ActiveModel {
-            group_id: Set(group_id),
-            filter_type: Set(group.filter_type.into()),
-            ..Default::default()
-        };
-
-        let filter_group = new_group.insert(db).await?;
-
-        let _ = bulk_create_filter_rules(db, group_id, Some(filter_group.id), group.rules).await;
-    }
-
-    Ok(())
-}
-
-pub async fn bulk_create_filter_rules(
-    db: &DatabaseConnection,
-    group_id: i32,
-    filter_group: Option<i32>,
-    rules: Vec<NewGroupFilterRuleDto>,
-) -> Result<(), DbErr> {
-    if rules.is_empty() {
-        return Ok(());
-    }
-
-    let mut new_rules: Vec<entity::auth_group_filter_rule::ActiveModel> = vec![];
-
-    for rule in rules {
-        let new_rule = entity::auth_group_filter_rule::ActiveModel {
-            group_id: Set(group_id),
-            filter_group_id: Set(filter_group),
-            criteria: Set(rule.criteria.into()),
-            criteria_type: Set(rule.criteria_type.into()),
-            criteria_value: Set(rule.criteria_value),
-            ..Default::default()
-        };
-
-        new_rules.push(new_rule)
-    }
-
-    entity::prelude::AuthGroupFilterRule::insert_many(new_rules)
-        .exec(db)
-        .await?;
-
-    Ok(())
-}
-
-pub async fn get_groups(db: &DatabaseConnection) -> Result<Vec<Group>, DbErr> {
-    entity::prelude::AuthGroup::find().all(db).await
-}
-
-pub async fn get_group_by_id(db: &DatabaseConnection, id: i32) -> Result<Option<Group>, DbErr> {
-    entity::prelude::AuthGroup::find()
-        .filter(entity::auth_group::Column::Id.eq(id))
-        .one(db)
-        .await
-}
-
-pub async fn bulk_get_groups_by_id(
-    db: &DatabaseConnection,
-    ids: Vec<i32>,
-) -> Result<Vec<Group>, DbErr> {
-    entity::prelude::AuthGroup::find()
-        .filter(entity::auth_group::Column::Id.is_in(ids))
-        .all(db)
-        .await
-}
-
-pub async fn get_group_filters(
-    db: &DatabaseConnection,
-    id: i32,
-) -> Result<Option<GroupFiltersDto>, DbErr> {
-    let group = entity::prelude::AuthGroup::find()
-        .filter(entity::auth_group::Column::Id.eq(id))
-        .one(db)
-        .await?;
-
-    match group {
-        Some(group) => {
-            let filter_rules = entity::prelude::AuthGroupFilterRule::find()
-                .filter(entity::auth_group_filter_rule::Column::GroupId.eq(id))
-                .filter(entity::auth_group_filter_rule::Column::FilterGroupId.is_null())
-                .all(db)
-                .await?;
-
-            let filter_groups = entity::prelude::AuthGroupFilterGroup::find()
-                .filter(entity::auth_group_filter_group::Column::GroupId.eq(id))
-                .all(db)
-                .await?;
-
-            let mut groups: Vec<GroupFilterGroupDto> = vec![];
-
-            for group in filter_groups {
-                let rules = entity::prelude::AuthGroupFilterRule::find()
-                    .filter(entity::auth_group_filter_rule::Column::GroupId.eq(id))
-                    .filter(entity::auth_group_filter_rule::Column::FilterGroupId.eq(group.id))
-                    .all(db)
-                    .await?;
-
-                let group = GroupFilterGroupDto {
-                    id: group.id,
-                    filter_type: group.filter_type.into(),
-                    rules: rules.into_iter().map(|rule| rule.into()).collect(),
-                };
-
-                groups.push(group)
-            }
-
-            let result = GroupFiltersDto {
-                id: group.id,
-                filter_type: group.filter_type.into(),
-                filter_rules: filter_rules.into_iter().map(|rule| rule.into()).collect(),
-                filter_groups: groups,
-            };
-
-            Ok(Some(result))
-        }
-        None => Ok(None),
-    }
-}
-
-pub async fn get_group_members(
-    db: &DatabaseConnection,
-    group_id: i32,
-) -> Result<Vec<UserDto>, sea_orm::DbErr> {
-    let members = entity::prelude::AuthGroupUser::find()
-        .filter(entity::auth_group_user::Column::GroupId.eq(group_id))
-        .all(db)
-        .await?;
-
-    let user_ids = members
-        .iter()
-        .map(|member| member.user_id)
-        .collect::<Vec<i32>>();
-
-    let ownerships = bulk_get_user_main_characters(db, user_ids).await?;
-    let character_ids = ownerships
-        .iter()
-        .map(|user| user.character_id)
-        .collect::<Vec<i32>>();
-
-    let characters = bulk_get_characters(db, character_ids).await?;
-
-    let characters = characters
-        .iter()
-        .filter_map(|character| {
-            ownerships
-                .iter()
-                .find(|&model| model.character_id == character.character_id)
-                .map(|model| model.user_id)
-                .map(|user_id| UserDto {
-                    id: user_id,
-                    character_name: character.character_name.clone(),
-                    character_id: character.character_id,
-                })
-        })
-        .collect::<Vec<UserDto>>();
-
-    Ok(characters)
-}
-
-pub async fn update_group(
-    db: &DatabaseConnection,
-    id: i32,
-    group: UpdateGroupDto,
-) -> Result<Group, anyhow::Error> {
-    match validate_group_filters(db, &group.clone().into()).await {
-        Ok(_) => (),
-        Err(err) => {
-            if err.is::<sea_orm::DbErr>() {
-                return Err(err);
-            }
-
-            return Err(err);
-        }
-    }
-
-    let updated_group = entity::auth_group::ActiveModel {
-        id: Set(id),
-        name: Set(group.name),
-        description: Set(group.description),
-        confidential: Set(group.confidential),
-        group_type: Set(group.group_type.into()),
-        filter_type: Set(group.filter_type.into()),
-    };
-
-    let updated_group = updated_group.update(db).await?;
-
-    update_filter_rules(db, id, None, group.filter_rules).await?;
-    update_filter_groups(db, id, group.filter_groups).await?;
-
-    // Queue update group members task
-
-    Ok(updated_group)
 }
 
 pub async fn add_group_members(
@@ -571,6 +329,8 @@ pub async fn add_group_members(
         })
         .collect();
 
+    // GROUP TYPE
+
     for group in models {
         group.insert(db).await?;
     }
@@ -578,18 +338,109 @@ pub async fn add_group_members(
     Ok(new_members)
 }
 
-pub async fn delete_group_members(
+pub async fn create_filter_groups(
     db: &DatabaseConnection,
     group_id: i32,
-    user_ids: Vec<i32>,
-) -> Result<u64, DbErr> {
-    let result = entity::prelude::AuthGroupUser::delete_many()
-        .filter(entity::auth_group_user::Column::GroupId.eq(group_id))
-        .filter(entity::auth_group_user::Column::UserId.is_in(user_ids))
+    filter_groups: Vec<NewGroupFilterGroupDto>,
+) -> Result<(), DbErr> {
+    for group in filter_groups {
+        let new_group = entity::auth_group_filter_group::ActiveModel {
+            group_id: Set(group_id),
+            filter_type: Set(group.filter_type.into()),
+            ..Default::default()
+        };
+
+        let filter_group = new_group.insert(db).await?;
+
+        let _ = bulk_create_filter_rules(db, group_id, Some(filter_group.id), group.rules).await;
+    }
+
+    Ok(())
+}
+
+pub async fn bulk_create_filter_rules(
+    db: &DatabaseConnection,
+    group_id: i32,
+    filter_group: Option<i32>,
+    rules: Vec<NewGroupFilterRuleDto>,
+) -> Result<(), DbErr> {
+    if rules.is_empty() {
+        return Ok(());
+    }
+
+    let mut new_rules: Vec<entity::auth_group_filter_rule::ActiveModel> = vec![];
+
+    for rule in rules {
+        let new_rule = entity::auth_group_filter_rule::ActiveModel {
+            group_id: Set(group_id),
+            filter_group_id: Set(filter_group),
+            criteria: Set(rule.criteria.into()),
+            criteria_type: Set(rule.criteria_type.into()),
+            criteria_value: Set(rule.criteria_value),
+            ..Default::default()
+        };
+
+        new_rules.push(new_rule)
+    }
+
+    entity::prelude::AuthGroupFilterRule::insert_many(new_rules)
         .exec(db)
         .await?;
 
-    Ok(result.rows_affected)
+    Ok(())
+}
+
+pub async fn get_group_filters(
+    db: &DatabaseConnection,
+    id: i32,
+) -> Result<Option<GroupFiltersDto>, DbErr> {
+    let group = entity::prelude::AuthGroup::find()
+        .filter(entity::auth_group::Column::Id.eq(id))
+        .one(db)
+        .await?;
+
+    match group {
+        Some(group) => {
+            let filter_rules = entity::prelude::AuthGroupFilterRule::find()
+                .filter(entity::auth_group_filter_rule::Column::GroupId.eq(id))
+                .filter(entity::auth_group_filter_rule::Column::FilterGroupId.is_null())
+                .all(db)
+                .await?;
+
+            let filter_groups = entity::prelude::AuthGroupFilterGroup::find()
+                .filter(entity::auth_group_filter_group::Column::GroupId.eq(id))
+                .all(db)
+                .await?;
+
+            let mut groups: Vec<GroupFilterGroupDto> = vec![];
+
+            for group in filter_groups {
+                let rules = entity::prelude::AuthGroupFilterRule::find()
+                    .filter(entity::auth_group_filter_rule::Column::GroupId.eq(id))
+                    .filter(entity::auth_group_filter_rule::Column::FilterGroupId.eq(group.id))
+                    .all(db)
+                    .await?;
+
+                let group = GroupFilterGroupDto {
+                    id: group.id,
+                    filter_type: group.filter_type.into(),
+                    rules: rules.into_iter().map(|rule| rule.into()).collect(),
+                };
+
+                groups.push(group)
+            }
+
+            let result = GroupFiltersDto {
+                id: group.id,
+                filter_type: group.filter_type.into(),
+                filter_rules: filter_rules.into_iter().map(|rule| rule.into()).collect(),
+                filter_groups: groups,
+            };
+
+            Ok(Some(result))
+        }
+        None => Ok(None),
+    }
 }
 
 pub async fn update_filter_groups(
@@ -690,24 +541,6 @@ pub async fn update_filter_rules(
         .await?;
 
     Ok(())
-}
-
-pub async fn delete_group(db: &DatabaseConnection, group_id: i32) -> Result<Option<i32>, DbErr> {
-    let group = entity::auth_group::ActiveModel {
-        id: Set(group_id),
-        ..Default::default()
-    };
-
-    let _ = delete_filter_rules(db, group_id).await;
-    let _ = delete_filter_groups(db, group_id).await;
-
-    let result = entity::prelude::AuthGroup::delete(group).exec(db).await?;
-
-    if result.rows_affected == 1 {
-        Ok(Some(group_id))
-    } else {
-        Ok(None)
-    }
 }
 
 pub async fn delete_filter_groups(

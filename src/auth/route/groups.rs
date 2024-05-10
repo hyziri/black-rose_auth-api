@@ -130,7 +130,7 @@ pub async fn add_group_members(
         // require permissions to add other users
     }
 
-    match data::groups::add_group_members(&db, group_id.0, user_ids.to_vec()).await {
+    match data::groups::filters::add_group_members(&db, group_id.0, user_ids.to_vec()).await {
         Ok(_) => (StatusCode::OK, "Users added successfully").into_response(),
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error leaving group").into_response(),
     }
@@ -227,7 +227,7 @@ pub async fn get_group_filters(
         Err(response) => return response,
     };
 
-    match data::groups::get_group_filters(&db, group_id.0).await {
+    match data::groups::filters::get_group_filters(&db, group_id.0).await {
         Ok(filters) => match filters {
             Some(filters) => (StatusCode::OK, Json(filters)).into_response(),
             None => (StatusCode::NOT_FOUND, "Group filters not found").into_response(),
