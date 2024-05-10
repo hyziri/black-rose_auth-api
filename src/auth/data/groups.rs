@@ -230,6 +230,16 @@ pub async fn get_group_by_id(db: &DatabaseConnection, id: i32) -> Result<Option<
         .await
 }
 
+pub async fn bulk_get_groups_by_id(
+    db: &DatabaseConnection,
+    ids: Vec<i32>,
+) -> Result<Vec<Group>, DbErr> {
+    entity::prelude::AuthGroup::find()
+        .filter(entity::auth_group::Column::Id.is_in(ids))
+        .all(db)
+        .await
+}
+
 pub async fn get_group_filters(
     db: &DatabaseConnection,
     id: i32,
