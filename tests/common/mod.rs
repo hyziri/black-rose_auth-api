@@ -2,7 +2,7 @@ use std::env;
 
 use black_rose_auth_api::auth::data;
 use eve_esi::initialize_eve_esi;
-use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Schema};
+use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Schema, Statement};
 
 use black_rose_auth_api::{
     auth::data::user::update_ownership,
@@ -32,8 +32,14 @@ pub async fn create_tables(db: &DatabaseConnection) -> Result<(), sea_orm::DbErr
     stmts.push(schema.create_table_from_entity(entity::prelude::AuthGroupUser));
 
     for stmt in stmts {
-        let _ = db.execute(db.get_database_backend().build(&stmt)).await;
+        let _ = db.execute(db.get_database_backend().build(&stmt)).await?;
     }
+
+    // Create index to prevent duplicate membership entries
+    // Add group member filter tests will fail without this index due to the constraint not being found
+    // If this can be created from entities instead switch to that method
+    db.execute(Statement::from_string(DbBackend::Sqlite, "CREATE UNIQUE INDEX IF NOT EXISTS \"idx-auth_group_user-group_id-user_id\" ON \"auth_group_user\" (\"group_id\", \"user_id\");"))
+        .await?;
 
     Ok(())
 }

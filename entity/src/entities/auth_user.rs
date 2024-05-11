@@ -18,8 +18,6 @@ pub enum Relation {
     AuthGroupUser,
     #[sea_orm(has_many = "super::auth_user_character_ownership::Entity")]
     AuthUserCharacterOwnership,
-    #[sea_orm(has_many = "super::auth_user_permission::Entity")]
-    AuthUserPermission,
 }
 
 impl Related<super::auth_group_user::Entity> for Entity {
@@ -31,12 +29,6 @@ impl Related<super::auth_group_user::Entity> for Entity {
 impl Related<super::auth_user_character_ownership::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::AuthUserCharacterOwnership.def()
-    }
-}
-
-impl Related<super::auth_user_permission::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::AuthUserPermission.def()
     }
 }
 

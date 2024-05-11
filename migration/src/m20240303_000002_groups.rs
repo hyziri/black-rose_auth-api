@@ -108,6 +108,30 @@ impl MigrationTrait for Migration {
             .await?;
 
         manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .name("idx-auth_group_user-group_id")
+                    .table(AuthGroupUser::Table)
+                    .col(AuthGroupUser::GroupId)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .name("idx-auth_group_user-group_id-user_id")
+                    .table(AuthGroupUser::Table)
+                    .col(AuthGroupUser::GroupId)
+                    .col(AuthGroupUser::UserId)
+                    .unique()
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
             .create_foreign_key(
                 sea_query::ForeignKey::create()
                     .name("fk-auth_group_user-auth_group")
@@ -403,6 +427,22 @@ impl MigrationTrait for Migration {
                 sea_query::ForeignKey::drop()
                     .name("fk-auth_group_user-auth_group")
                     .table(AuthGroupUser::Table)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .drop_index(
+                sea_query::Index::drop()
+                    .name("idx-auth_group_user-group_id-user_id")
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .drop_index(
+                sea_query::Index::drop()
+                    .name("idx-auth_group_user-group_id")
                     .to_owned(),
             )
             .await?;

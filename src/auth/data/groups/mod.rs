@@ -1,5 +1,6 @@
 pub mod filters;
 
+use migration::OnConflict;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
     InsertResult, QueryFilter, TryInsertResult,
@@ -180,6 +181,14 @@ pub async fn add_group_members(
 
         let result = entity::prelude::AuthGroupUser::insert_many(new_members)
             .on_empty_do_nothing()
+            .on_conflict(
+                OnConflict::columns(vec![
+                    entity::auth_group_user::Column::GroupId,
+                    entity::auth_group_user::Column::UserId,
+                ])
+                .do_nothing()
+                .to_owned(),
+            )
             .exec(db)
             .await?;
 
