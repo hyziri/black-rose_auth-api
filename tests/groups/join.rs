@@ -6,7 +6,7 @@ use black_rose_auth_api::auth::{
         NewGroupFilterRuleDto,
     },
 };
-use sea_orm::Database;
+use sea_orm::{Database, TryInsertResult};
 
 #[tokio::test]
 async fn group_type_open() -> Result<(), anyhow::Error> {
@@ -48,9 +48,12 @@ async fn group_type_open() -> Result<(), anyhow::Error> {
     }
 
     for group_id in group_ids {
-        let result = add_group_members(&db, group_id, vec![user_id]).await?;
+        let result = add_group_members(&db, group_id, vec![user_id], false).await?;
 
-        assert_eq!(result.len(), 1);
+        assert!(
+            matches!(result, TryInsertResult::Inserted(_)),
+            "User rejected when they should be accepted"
+        );
     }
 
     Ok(())
@@ -98,18 +101,16 @@ async fn filter_type_any() -> Result<(), anyhow::Error> {
 
     let group_id = create_group(&db, group).await?.id;
 
-    let accept_result = add_group_members(&db, group_id, vec![eligible_user_id]).await?;
-    let reject_result = add_group_members(&db, group_id, vec![ineligible_user_id]).await?;
+    let accept_result = add_group_members(&db, group_id, vec![eligible_user_id], false).await?;
+    let reject_result = add_group_members(&db, group_id, vec![ineligible_user_id], false).await?;
 
-    assert_eq!(
-        accept_result.len(),
-        1,
+    assert!(
+        matches!(accept_result, TryInsertResult::Inserted(_)),
         "User rejected when they should be accepted"
     );
 
-    assert_eq!(
-        reject_result.len(),
-        0,
+    assert!(
+        matches!(reject_result, TryInsertResult::Empty),
         "User accepted when they should be rejected"
     );
 
@@ -160,18 +161,16 @@ async fn filter_type_all() -> Result<(), anyhow::Error> {
     };
 
     let group_id = create_group(&db, group).await?.id;
-    let accept_result = add_group_members(&db, group_id, vec![eligible_user_id]).await?;
-    let reject_result = add_group_members(&db, group_id, vec![ineligible_user_id]).await?;
+    let accept_result = add_group_members(&db, group_id, vec![eligible_user_id], false).await?;
+    let reject_result = add_group_members(&db, group_id, vec![ineligible_user_id], false).await?;
 
-    assert_eq!(
-        accept_result.len(),
-        1,
+    assert!(
+        matches!(accept_result, TryInsertResult::Inserted(_)),
         "User rejected when they should be accepted"
     );
 
-    assert_eq!(
-        reject_result.len(),
-        0,
+    assert!(
+        matches!(reject_result, TryInsertResult::Empty),
         "User accepted when they should be rejected"
     );
 
@@ -197,18 +196,16 @@ async fn test_filter(group: NewGroupDto) -> Result<(), anyhow::Error> {
     .await?;
 
     let group_id = create_group(&db, group).await?.id;
-    let accept_result = add_group_members(&db, group_id, vec![eligible_user_id]).await?;
-    let reject_result = add_group_members(&db, group_id, vec![ineligible_user_id]).await?;
+    let accept_result = add_group_members(&db, group_id, vec![eligible_user_id], false).await?;
+    let reject_result = add_group_members(&db, group_id, vec![ineligible_user_id], false).await?;
 
-    assert_eq!(
-        accept_result.len(),
-        1,
+    assert!(
+        matches!(accept_result, TryInsertResult::Inserted(_)),
         "User rejected when they should be accepted"
     );
 
-    assert_eq!(
-        reject_result.len(),
-        0,
+    assert!(
+        matches!(reject_result, TryInsertResult::Empty),
         "User accepted when they should be rejected"
     );
 
@@ -245,7 +242,7 @@ async fn group_filter() -> Result<(), anyhow::Error> {
     };
 
     let group_1_id = create_group(&db, group_1).await?.id;
-    let _ = add_group_members(&db, group_1_id, vec![eligible_user_id]).await?;
+    let _ = add_group_members(&db, group_1_id, vec![eligible_user_id], false).await?;
 
     let group_2 = NewGroupDto {
         name: "No Requirements".to_string(),
@@ -262,18 +259,16 @@ async fn group_filter() -> Result<(), anyhow::Error> {
     };
 
     let group_2_id = create_group(&db, group_2).await?.id;
-    let accept_result = add_group_members(&db, group_2_id, vec![eligible_user_id]).await?;
-    let reject_result = add_group_members(&db, group_2_id, vec![ineligible_user_id]).await?;
+    let accept_result = add_group_members(&db, group_2_id, vec![eligible_user_id], false).await?;
+    let reject_result = add_group_members(&db, group_2_id, vec![ineligible_user_id], false).await?;
 
-    assert_eq!(
-        accept_result.len(),
-        1,
+    assert!(
+        matches!(accept_result, TryInsertResult::Inserted(_)),
         "User rejected when they should be accepted"
     );
 
-    assert_eq!(
-        reject_result.len(),
-        0,
+    assert!(
+        matches!(reject_result, TryInsertResult::Empty),
         "User accepted when they should be rejected"
     );
 
@@ -364,11 +359,10 @@ async fn executor_filter() -> Result<(), anyhow::Error> {
     };
 
     let group_id = create_group(&db, group).await?.id;
-    let accept_result = add_group_members(&db, group_id, vec![eligible_user_id]).await?;
+    let accept_result = add_group_members(&db, group_id, vec![eligible_user_id], false).await?;
 
-    assert_eq!(
-        accept_result.len(),
-        1,
+    assert!(
+        matches!(accept_result, TryInsertResult::Inserted(_)),
         "User rejected when they should be accepted"
     );
 

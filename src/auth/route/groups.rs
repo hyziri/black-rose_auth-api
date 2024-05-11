@@ -130,7 +130,7 @@ pub async fn add_group_members(
         // require permissions to add other users
     }
 
-    match data::groups::add_group_members(&db, group_id.0, user_ids.to_vec()).await {
+    match data::groups::add_group_members(&db, group_id.0, user_ids.to_vec(), false).await {
         Ok(_) => (StatusCode::OK, "Users added successfully").into_response(),
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error leaving group").into_response(),
     }
