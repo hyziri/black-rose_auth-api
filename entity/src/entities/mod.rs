@@ -3,6 +3,7 @@
 pub mod prelude;
 
 pub mod auth_group;
+pub mod auth_group_application;
 pub mod auth_group_filter_group;
 pub mod auth_group_filter_rule;
 pub mod auth_group_user;

@@ -1,3 +1,4 @@
+use chrono::Utc;
 use sea_orm_migration::prelude::*;
 use sea_orm_migration::sea_query::extension::postgres::Type;
 
@@ -334,10 +335,181 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
+        manager
+            .create_type(
+                Type::create()
+                    .as_enum(Alias::new("group_application_type"))
+                    .values([
+                        Alias::new("JoinRequest"),
+                        Alias::new("LeaveRequest"),
+                        Alias::new("Invitation"),
+                    ])
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .table(AuthGroupApplication::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(AuthGroupApplication::Id)
+                            .integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(AuthGroupApplication::GroupId)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AuthGroupApplication::UserId)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AuthGroupApplication::ApplicationType)
+                            .enumeration(
+                                Alias::new("group_application_type"),
+                                [
+                                    Alias::new("JoinRequest"),
+                                    Alias::new("LeaveRequest"),
+                                    Alias::new("Invitation"),
+                                ],
+                            )
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(AuthGroupApplication::ApplicationText).text())
+                    .col(
+                        ColumnDef::new(AuthGroupApplication::Created)
+                            .timestamp()
+                            .not_null()
+                            .default(Utc::now().naive_utc()),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .name("idx-auth_group_application-group_id-user_id")
+                    .table(AuthGroupApplication::Table)
+                    .col(AuthGroupApplication::GroupId)
+                    .col(AuthGroupApplication::UserId)
+                    .unique()
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .name("idx-auth_group_application-group_id")
+                    .table(AuthGroupApplication::Table)
+                    .col(AuthGroupApplication::GroupId)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .name("idx-auth_group_application-user_id")
+                    .table(AuthGroupApplication::Table)
+                    .col(AuthGroupApplication::UserId)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_foreign_key(
+                sea_query::ForeignKey::create()
+                    .name("fk-auth_group_application-auth_user")
+                    .from_tbl(AuthGroupApplication::Table)
+                    .from_col(AuthGroupApplication::UserId)
+                    .to_tbl(AuthUser::Table)
+                    .to_col(AuthUser::Id)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_foreign_key(
+                sea_query::ForeignKey::create()
+                    .name("fk-auth_group_application-auth_group")
+                    .from_tbl(AuthGroupApplication::Table)
+                    .from_col(AuthGroupApplication::GroupId)
+                    .to_tbl(AuthGroup::Table)
+                    .to_col(AuthGroup::Id)
+                    .to_owned(),
+            )
+            .await?;
+
         Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_foreign_key(
+                sea_query::ForeignKey::drop()
+                    .name("fk-auth_group_application-auth_group")
+                    .table(AuthGroupApplication::Table)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .drop_foreign_key(
+                sea_query::ForeignKey::drop()
+                    .name("fk-auth_group_application-auth_user")
+                    .table(AuthGroupApplication::Table)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .drop_index(
+                sea_query::Index::drop()
+                    .name("idx-auth_group_application-user_id")
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .drop_index(
+                sea_query::Index::drop()
+                    .name("idx-auth_group_application-group_id")
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .drop_index(
+                sea_query::Index::drop()
+                    .name("idx-auth_group_application-group_id-user_id")
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .drop_table(Table::drop().table(AuthGroupApplication::Table).to_owned())
+            .await?;
+
+        manager
+            .drop_type(
+                Type::drop()
+                    .name(Alias::new("group_application_type"))
+                    .to_owned(),
+            )
+            .await?;
+
         manager
             .drop_foreign_key(
                 sea_query::ForeignKey::drop()
@@ -515,4 +687,15 @@ enum AuthGroupFilterRule {
     Criteria,      // Group, Corporation, Alliance, Role
     CriteriaType,  // IS, IS NOT, GREATER THAN, LESS THAN
     CriteriaValue, // GroupId, CorporationId, AllianceId, Corp CEO/Executor
+}
+
+#[derive(DeriveIden)]
+enum AuthGroupApplication {
+    Table,
+    Id,
+    GroupId,
+    UserId,
+    ApplicationType, // JoinRequest, LeaveRequest, Invitation
+    ApplicationText,
+    Created,
 }

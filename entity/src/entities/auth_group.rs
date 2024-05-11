@@ -20,12 +20,20 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
+    #[sea_orm(has_many = "super::auth_group_application::Entity")]
+    AuthGroupApplication,
     #[sea_orm(has_many = "super::auth_group_filter_group::Entity")]
     AuthGroupFilterGroup,
     #[sea_orm(has_many = "super::auth_group_filter_rule::Entity")]
     AuthGroupFilterRule,
     #[sea_orm(has_many = "super::auth_group_user::Entity")]
     AuthGroupUser,
+}
+
+impl Related<super::auth_group_application::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::AuthGroupApplication.def()
+    }
 }
 
 impl Related<super::auth_group_filter_group::Entity> for Entity {

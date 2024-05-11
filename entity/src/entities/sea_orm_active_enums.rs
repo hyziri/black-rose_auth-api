@@ -7,6 +7,20 @@ use serde::{Deserialize, Serialize};
 #[sea_orm(
     rs_type = "String",
     db_type = "Enum",
+    enum_name = "group_application_type"
+)]
+pub enum GroupApplicationType {
+    #[sea_orm(string_value = "Invitation")]
+    Invitation,
+    #[sea_orm(string_value = "JoinRequest")]
+    JoinRequest,
+    #[sea_orm(string_value = "LeaveRequest")]
+    LeaveRequest,
+}
+#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
+#[sea_orm(
+    rs_type = "String",
+    db_type = "Enum",
     enum_name = "group_filter_criteria"
 )]
 pub enum GroupFilterCriteria {
