@@ -345,6 +345,19 @@ impl MigrationTrait for Migration {
             .await?;
 
         manager
+            .create_type(
+                Type::create()
+                    .as_enum(Alias::new("group_application_status"))
+                    .values([
+                        Alias::new("Outstanding"),
+                        Alias::new("Accepted"),
+                        Alias::new("Rejected"),
+                    ])
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
             .create_table(
                 Table::create()
                     .table(AuthGroupApplication::Table)
@@ -374,9 +387,29 @@ impl MigrationTrait for Migration {
                             )
                             .not_null(),
                     )
-                    .col(ColumnDef::new(AuthGroupApplication::ApplicationText).text())
+                    .col(
+                        ColumnDef::new(AuthGroupApplication::ApplicationStatus)
+                            .enumeration(
+                                Alias::new("group_application_status"),
+                                [
+                                    Alias::new("Outstanding"),
+                                    Alias::new("Accepted"),
+                                    Alias::new("Rejected"),
+                                ],
+                            )
+                            .not_null()
+                            .default("Outstanding"),
+                    )
+                    .col(ColumnDef::new(AuthGroupApplication::ApplicationRequestMessage).text())
+                    .col(ColumnDef::new(AuthGroupApplication::ApplicationResponseMessage).text())
                     .col(
                         ColumnDef::new(AuthGroupApplication::Created)
+                            .timestamp()
+                            .not_null()
+                            .default(Utc::now().naive_utc()),
+                    )
+                    .col(
+                        ColumnDef::new(AuthGroupApplication::LastUpdated)
                             .timestamp()
                             .not_null()
                             .default(Utc::now().naive_utc()),
@@ -492,6 +525,14 @@ impl MigrationTrait for Migration {
 
         manager
             .drop_table(Table::drop().table(AuthGroupApplication::Table).to_owned())
+            .await?;
+
+        manager
+            .drop_type(
+                Type::drop()
+                    .name(Alias::new("group_application_status"))
+                    .to_owned(),
+            )
             .await?;
 
         manager
@@ -687,7 +728,10 @@ enum AuthGroupApplication {
     Id,
     GroupId,
     UserId,
-    ApplicationType, // JoinRequest, LeaveRequest
-    ApplicationText,
+    ApplicationType,   // JoinRequest, LeaveRequest
+    ApplicationStatus, // Outstanding, Accepted, Rejected
+    ApplicationRequestMessage,
+    ApplicationResponseMessage, // Message for application accepted/rejected
     Created,
+    LastUpdated,
 }

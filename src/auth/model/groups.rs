@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -172,6 +173,45 @@ impl From<entity::sea_orm_active_enums::GroupApplicationType> for GroupApplicati
     }
 }
 
+#[derive(Serialize, Deserialize, ToSchema, Clone, PartialEq)]
+pub enum GroupApplicationStatus {
+    Outstanding,
+    Accepted,
+    Rejected,
+}
+
+impl From<GroupApplicationStatus> for entity::sea_orm_active_enums::GroupApplicationStatus {
+    fn from(item: GroupApplicationStatus) -> Self {
+        match item {
+            GroupApplicationStatus::Outstanding => {
+                entity::sea_orm_active_enums::GroupApplicationStatus::Outstanding
+            }
+            GroupApplicationStatus::Accepted => {
+                entity::sea_orm_active_enums::GroupApplicationStatus::Accepted
+            }
+            GroupApplicationStatus::Rejected => {
+                entity::sea_orm_active_enums::GroupApplicationStatus::Rejected
+            }
+        }
+    }
+}
+
+impl From<entity::sea_orm_active_enums::GroupApplicationStatus> for GroupApplicationStatus {
+    fn from(item: entity::sea_orm_active_enums::GroupApplicationStatus) -> Self {
+        match item {
+            entity::sea_orm_active_enums::GroupApplicationStatus::Outstanding => {
+                GroupApplicationStatus::Outstanding
+            }
+            entity::sea_orm_active_enums::GroupApplicationStatus::Accepted => {
+                GroupApplicationStatus::Accepted
+            }
+            entity::sea_orm_active_enums::GroupApplicationStatus::Rejected => {
+                GroupApplicationStatus::Rejected
+            }
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct GroupDto {
     pub id: i32,
@@ -231,7 +271,12 @@ pub struct GroupApplicationDto {
     pub group_id: i32,
     pub user_id: i32,
     pub character_info: CharacterAffiliationDto,
-    pub application_text: Option<String>,
+    pub application_type: GroupApplicationType,
+    pub application_status: GroupApplicationStatus,
+    pub application_request_message: Option<String>,
+    pub application_response_message: Option<String>,
+    pub created: DateTime<Utc>,
+    pub last_updated: DateTime<Utc>,
 }
 
 #[derive(Deserialize, ToSchema)]

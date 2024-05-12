@@ -11,13 +11,13 @@ use sea_orm::DatabaseConnection;
 use tower_sessions::Session;
 
 use crate::auth::data;
-use crate::auth::model::groups::GroupApplicationType;
+use crate::auth::model::groups::{GroupApplicationStatus, GroupApplicationType};
 use crate::auth::permissions::require_permissions;
 
 pub fn group_application_routes() -> Router {
     Router::new()
         .route(
-            "/:group_id/applications/:application_type",
+            "/:group_id/applications/:application_status/:application_type",
             get(get_group_applications),
         )
         .route(
@@ -32,7 +32,7 @@ pub fn group_application_routes() -> Router {
 
 #[utoipa::path(
     get,
-    path = "/groups/{group_id}/applications/{application_type}",
+    path = "/groups/{group_id}/applications/{application_status}/{application_type}",
     responses(
         (status = 200, description = "Outstanding join applications", body = GroupDto),
         (status = 403, description = "Insufficient permissions", body = String),
@@ -46,15 +46,22 @@ pub fn group_application_routes() -> Router {
 pub async fn get_group_applications(
     Extension(db): Extension<DatabaseConnection>,
     session: Session,
-    Path(path): Path<(i32, GroupApplicationType)>,
+    Path(path): Path<(i32, GroupApplicationStatus, GroupApplicationType)>,
 ) -> Response {
     match require_permissions(&db, session).await {
         Ok(_) => (),
         Err(response) => return response,
     };
 
-    match data::groups::get_group_application(&db, Some(path.1.into()), None, Some(path.0), None)
-        .await
+    match data::groups::get_group_application(
+        &db,
+        Some(path.1.into()),
+        Some(path.2.into()),
+        None,
+        Some(path.0),
+        None,
+    )
+    .await
     {
         Ok(applications) => (StatusCode::OK, Json(applications)).into_response(),
         Err(err) => {
@@ -65,6 +72,8 @@ pub async fn get_group_applications(
             if err.to_string() == "Group does not require applications" {
                 return (StatusCode::FORBIDDEN, err.to_string()).into_response();
             }
+
+            println!("{}", err);
 
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -99,7 +108,7 @@ pub async fn update_group_application(
         Err(response) => return response,
     };
 
-    match data::groups::get_group_application(&db, None, Some(path.0), None, None).await {
+    match data::groups::get_group_application(&db, None, None, Some(path.0), None, None).await {
         Ok(application) => {
             if application.is_empty() {
                 return (StatusCode::NOT_FOUND, "Application does not exist").into_response();
@@ -161,7 +170,7 @@ pub async fn delete_group_application(
         Err(response) => return response,
     };
 
-    match data::groups::get_group_application(&db, None, Some(path.0), None, None).await {
+    match data::groups::get_group_application(&db, None, None, Some(path.0), None, None).await {
         Ok(application) => {
             if application[0].user_id != user_id {
                 return (

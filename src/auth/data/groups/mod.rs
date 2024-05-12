@@ -3,6 +3,7 @@ pub mod filters;
 use std::collections::HashMap;
 
 use anyhow::anyhow;
+use chrono::{DateTime, Utc};
 use migration::OnConflict;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DbErr, DeleteResult,
@@ -22,7 +23,7 @@ use crate::{
 
 use entity::{
     auth_group::Model as Group,
-    sea_orm_active_enums::{GroupApplicationType, GroupType},
+    sea_orm_active_enums::{GroupApplicationStatus, GroupApplicationType, GroupType},
 };
 
 use filters::validate_group_filters;
@@ -132,7 +133,8 @@ pub async fn get_group_members(
 
 pub async fn get_group_application(
     db: &DatabaseConnection,
-    application_filter: Option<GroupApplicationType>,
+    application_status: Option<GroupApplicationStatus>,
+    application_type: Option<GroupApplicationType>,
     application_id: Option<i32>,
     group_id: Option<i32>,
     user_id: Option<i32>,
@@ -157,9 +159,15 @@ pub async fn get_group_application(
 
     let mut query = entity::prelude::AuthGroupApplication::find();
 
-    if let Some(application_filter) = application_filter {
+    if let Some(application_type) = application_type {
         query = query.filter(
-            entity::auth_group_application::Column::ApplicationType.eq(Some(application_filter)),
+            entity::auth_group_application::Column::ApplicationType.eq(Some(application_type)),
+        );
+    }
+
+    if let Some(application_status) = application_status {
+        query = query.filter(
+            entity::auth_group_application::Column::ApplicationStatus.eq(Some(application_status)),
         );
     }
 
@@ -210,7 +218,12 @@ pub async fn get_group_application(
                 group_id: application.group_id,
                 user_id: application.user_id,
                 character_info: character,
-                application_text: application.application_text,
+                application_status: application.application_status.into(),
+                application_type: application.application_type.into(),
+                application_request_message: application.application_request_message,
+                application_response_message: application.application_response_message,
+                created: DateTime::from_naive_utc_and_offset(application.created, Utc),
+                last_updated: DateTime::from_naive_utc_and_offset(application.last_updated, Utc),
             };
 
             group_applications.push(group_application);
@@ -269,7 +282,7 @@ pub async fn update_group_application(
         Some(application) => {
             let mut application: entity::auth_group_application::ActiveModel = application.into();
 
-            application.application_text = Set(application_text);
+            application.application_request_message = Set(application_text);
 
             let application = application.update(db).await?;
 
@@ -348,7 +361,7 @@ pub async fn join_group(
                 group_id: Set(group_id),
                 user_id: Set(user_id),
                 application_type: Set(GroupApplicationType::Join),
-                application_text: Set(application_text),
+                application_request_message: Set(application_text),
                 ..Default::default()
             };
 
@@ -433,7 +446,7 @@ pub async fn leave_group(
                 group_id: Set(group_id),
                 user_id: Set(user_id),
                 application_type: Set(GroupApplicationType::Leave),
-                application_text: Set(application_text),
+                application_request_message: Set(application_text),
                 ..Default::default()
             };
 
