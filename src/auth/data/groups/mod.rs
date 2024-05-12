@@ -312,7 +312,7 @@ pub async fn join_group(
             let application = entity::auth_group_application::ActiveModel {
                 group_id: Set(group_id),
                 user_id: Set(user_id),
-                application_type: Set(GroupApplicationType::JoinRequest),
+                application_type: Set(GroupApplicationType::Join),
                 application_text: Set(application_text),
                 ..Default::default()
             };
@@ -397,7 +397,7 @@ pub async fn leave_group(
             let application = entity::auth_group_application::ActiveModel {
                 group_id: Set(group_id),
                 user_id: Set(user_id),
-                application_type: Set(GroupApplicationType::LeaveRequest),
+                application_type: Set(GroupApplicationType::Leave),
                 application_text: Set(application_text),
                 ..Default::default()
             };

@@ -10,12 +10,10 @@ use serde::{Deserialize, Serialize};
     enum_name = "group_application_type"
 )]
 pub enum GroupApplicationType {
-    #[sea_orm(string_value = "Invitation")]
-    Invitation,
-    #[sea_orm(string_value = "JoinRequest")]
-    JoinRequest,
-    #[sea_orm(string_value = "LeaveRequest")]
-    LeaveRequest,
+    #[sea_orm(string_value = "Join")]
+    Join,
+    #[sea_orm(string_value = "Leave")]
+    Leave,
 }
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
 #[sea_orm(

@@ -144,6 +144,34 @@ impl From<entity::sea_orm_active_enums::GroupFilterCriteriaType> for GroupFilter
     }
 }
 
+#[derive(Serialize, Deserialize, ToSchema, Clone, PartialEq)]
+pub enum GroupApplicationType {
+    Join,
+    Leave,
+}
+
+impl From<GroupApplicationType> for entity::sea_orm_active_enums::GroupApplicationType {
+    fn from(item: GroupApplicationType) -> Self {
+        match item {
+            GroupApplicationType::Join => entity::sea_orm_active_enums::GroupApplicationType::Join,
+            GroupApplicationType::Leave => {
+                entity::sea_orm_active_enums::GroupApplicationType::Leave
+            }
+        }
+    }
+}
+
+impl From<entity::sea_orm_active_enums::GroupApplicationType> for GroupApplicationType {
+    fn from(item: entity::sea_orm_active_enums::GroupApplicationType) -> Self {
+        match item {
+            entity::sea_orm_active_enums::GroupApplicationType::Join => GroupApplicationType::Join,
+            entity::sea_orm_active_enums::GroupApplicationType::Leave => {
+                GroupApplicationType::Leave
+            }
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct GroupDto {
     pub id: i32,
