@@ -1,3 +1,4 @@
+pub mod applications;
 pub mod members;
 
 use axum::extract::Path;
@@ -13,16 +14,12 @@ use axum::{
 use sea_orm::DatabaseConnection;
 use tower_sessions::Session;
 
+use self::applications::group_application_routes;
 use self::members::group_member_routes;
+
 use crate::auth::data;
 use crate::auth::model::groups::{GroupDto, NewGroupDto, UpdateGroupDto};
 use crate::auth::permissions::require_permissions;
-
-pub use self::members::{
-    __path_add_group_members, __path_delete_group_members, __path_get_group_applications,
-    __path_get_group_members, __path_join_group, __path_leave_group,
-    __path_update_group_application,
-};
 
 pub fn group_routes() -> Router {
     Router::new()
@@ -33,6 +30,7 @@ pub fn group_routes() -> Router {
         .route("/:id", delete(delete_group))
         .route("/:id/filters", get(get_group_filters))
         .nest("", group_member_routes())
+        .nest("", group_application_routes())
 }
 
 #[utoipa::path(

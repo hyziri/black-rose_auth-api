@@ -4,9 +4,7 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::auth::model::{
     groups::{
-        GroupFiltersDto, GroupDto, GroupFilterCriteria, GroupFilterCriteriaType, GroupFilterGroupDto,
-        GroupFilterRuleDto, GroupFilterType, GroupType, NewGroupDto, NewGroupFilterGroupDto,
-        NewGroupFilterRuleDto, UpdateGroupDto, UpdateGroupFilterGroupDto, UpdateGroupFilterRuleDto, GroupApplicationDto
+        GroupApplicationDto, GroupApplicationType, GroupDto, GroupFilterCriteria, GroupFilterCriteriaType, GroupFilterGroupDto, GroupFilterRuleDto, GroupFilterType, GroupFiltersDto, GroupType, NewGroupDto, NewGroupFilterGroupDto, NewGroupFilterRuleDto, UpdateGroupDto, UpdateGroupFilterGroupDto, UpdateGroupFilterRuleDto
     },
     user::UserDto,
 };
@@ -22,9 +20,9 @@ pub fn routes() -> Router {
             user::get_user_groups,
             groups::create_group, groups::get_groups, groups::get_group_by_id,
             groups::get_group_filters, groups::update_group, groups::delete_group,
-            groups::join_group, groups::leave_group,
-            groups::get_group_members, groups::add_group_members, groups::delete_group_members,
-            groups::get_group_applications, groups::update_group_application
+            groups::members::join_group, groups::members::leave_group,
+            groups::members::get_group_members, groups::members::add_group_members, groups::members::delete_group_members,
+            groups::applications::get_group_applications, groups::applications::update_group_application,
         ),
         components(schemas(
             UserDto, CharacterAffiliationDto, 
@@ -32,7 +30,7 @@ pub fn routes() -> Router {
             GroupFiltersDto, GroupDto, GroupFilterRuleDto, GroupFilterGroupDto, 
             UpdateGroupDto, UpdateGroupFilterRuleDto, UpdateGroupFilterGroupDto,
             GroupType, GroupFilterType, GroupFilterCriteria, GroupFilterCriteriaType,
-            GroupApplicationDto)),
+            GroupApplicationDto, GroupApplicationType)),
         tags(
             (name = "Black Rose Auth API", description = "Black Rose Auth API endpoints")
         )
