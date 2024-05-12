@@ -3,7 +3,7 @@ pub mod filters;
 use std::collections::HashMap;
 
 use anyhow::anyhow;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use migration::OnConflict;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DbErr, DeleteResult,
@@ -280,9 +280,14 @@ pub async fn update_group_application(
 
     match application {
         Some(application) => {
+            if application.application_status != GroupApplicationStatus::Outstanding {
+                return Err(anyhow!("Not allowed to update a completed application"));
+            }
+
             let mut application: entity::auth_group_application::ActiveModel = application.into();
 
             application.application_request_message = Set(application_text);
+            application.last_updated = Set(Utc::now().naive_utc());
 
             let application = application.update(db).await?;
 
@@ -474,10 +479,24 @@ pub async fn leave_group(
 pub async fn delete_group_application(
     db: &DatabaseConnection,
     application_id: i32,
-) -> Result<DeleteResult, DbErr> {
-    let result = entity::prelude::AuthGroupApplication::delete_by_id(application_id)
-        .exec(db)
+) -> Result<DeleteResult, anyhow::Error> {
+    let application = entity::prelude::AuthGroupApplication::find()
+        .filter(entity::auth_group_application::Column::Id.eq(application_id))
+        .one(db)
         .await?;
 
-    Ok(result)
+    match application {
+        Some(application) => {
+            if application.application_status != GroupApplicationStatus::Outstanding {
+                return Err(anyhow!("Not allowed to delete a completed application"));
+            }
+
+            let result = entity::prelude::AuthGroupApplication::delete_by_id(application_id)
+                .exec(db)
+                .await?;
+
+            Ok(result)
+        }
+        None => Err(anyhow!("Application not found")),
+    }
 }

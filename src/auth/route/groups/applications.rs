@@ -122,7 +122,11 @@ pub async fn update_group_application(
                     .into_response();
             };
         }
-        Err(_) => {
+        Err(err) => {
+            if err.to_string() == "Not allowed to update a completed application" {
+                return (StatusCode::FORBIDDEN, err.to_string()).into_response();
+            }
+
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Error getting group applications",
@@ -197,10 +201,18 @@ pub async fn delete_group_application(
 
             (StatusCode::OK, "Successfully deleted application").into_response()
         }
-        Err(_) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Error deleting application",
-        )
-            .into_response(),
+        Err(err) => {
+            if err.to_string() == "Not allowed to delete a completed application" {
+                return (StatusCode::FORBIDDEN, err.to_string()).into_response();
+            } else if err.to_string() == "Application not found" {
+                return (StatusCode::NOT_FOUND, err.to_string()).into_response();
+            }
+
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error deleting application",
+            )
+                .into_response()
+        }
     }
 }
