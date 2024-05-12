@@ -19,13 +19,14 @@ pub fn group_routes() -> Router {
         .route("/", post(create_group))
         .route("/", get(get_groups))
         .route("/:id", get(get_group_by_id))
+        .route("/:id", put(update_group))
+        .route("/:id", delete(delete_group))
         .route("/:id/filters", get(get_group_filters))
         .route("/:id/members", get(get_group_members))
         .route("/:id/members", post(add_group_members))
         .route("/:id/members", delete(delete_group_members))
         .route("/:id/join", post(join_group))
-        .route("/:id", put(update_group))
-        .route("/:id", delete(delete_group))
+        .route("/:id/leave", delete(leave_group))
 }
 
 async fn require_permissions(db: &DatabaseConnection, session: Session) -> Result<i32, Response> {
@@ -108,7 +109,7 @@ pub async fn create_group(
         (status = 200, description = "Joined/applied successfully", body = GroupDto),
         (status = 403, description = "Forbidden", body = String),
         (status = 404, description = "Not found", body = String),
-        (status = 409, description = "Application already exists", body = String),
+        (status = 409, description = "Application to join already exists", body = String),
         (status = 500, description = "Internal server error", body = String)
     ),
     security(
@@ -129,7 +130,7 @@ pub async fn join_group(
     match data::groups::join_group(&db, group_id.0, user_id, application_text.0).await {
         Ok(message) => (StatusCode::OK, message).into_response(),
         Err(err) => {
-            if err.to_string() == "Application already exists"
+            if err.to_string() == "Application to join already exists"
                 || err.to_string() == "Already a member"
             {
                 return (StatusCode::CONFLICT, err.to_string()).into_response();
@@ -403,6 +404,51 @@ pub async fn delete_group(
 
 #[utoipa::path(
     delete,
+    path = "/groups/{id}/leave",
+    responses(
+        (status = 200, description = "Left/sent request to leave successfully", body = GroupDto),
+        (status = 403, description = "Forbidden", body = String),
+        (status = 404, description = "Not found", body = String),
+        (status = 409, description = "Application already exists", body = String),
+        (status = 500, description = "Internal server error", body = String)
+    ),
+    security(
+        ("login" = [])
+    )
+)]
+pub async fn leave_group(
+    Extension(db): Extension<DatabaseConnection>,
+    session: Session,
+    Path(group_id): Path<(i32,)>,
+    application_text: Json<Option<String>>,
+) -> Response {
+    let user_id = match require_permissions(&db, session).await {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+
+    match data::groups::leave_group(&db, group_id.0, user_id, application_text.0).await {
+        Ok(_) => (StatusCode::OK, "Left group successfully").into_response(),
+        Err(err) => {
+            if err.to_string() == "Application to leave already exists"
+                || err.to_string() == "User is not a member of the group"
+            {
+                return (StatusCode::CONFLICT, err.to_string()).into_response();
+            } else if err.to_string() == "Group does not exist" {
+                return (StatusCode::NOT_FOUND, err.to_string()).into_response();
+            }
+
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error adding user to group",
+            )
+                .into_response()
+        }
+    }
+}
+
+#[utoipa::path(
+    delete,
     path = "/groups/{id}/members",
     responses(
         (status = 200, description = "Users removed successfully", body = GroupDto),
@@ -420,16 +466,12 @@ pub async fn delete_group_members(
     Path(group_id): Path<(i32,)>,
     user_ids: Json<Vec<i32>>,
 ) -> Response {
-    let user_id = match require_permissions(&db, session).await {
-        Ok(user_id) => user_id,
+    match require_permissions(&db, session).await {
+        Ok(_) => (),
         Err(response) => return response,
     };
 
     let user_ids = user_ids.to_vec();
-
-    if user_ids.len() == 1 && user_ids[0] != user_id {
-        // require permissions to remove other users
-    }
 
     match data::groups::delete_group_members(&db, group_id.0, user_ids.to_vec()).await {
         Ok(_) => (StatusCode::OK, "Users removed successfully").into_response(),

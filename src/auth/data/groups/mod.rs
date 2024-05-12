@@ -162,6 +162,44 @@ pub async fn update_group(
     Ok(updated_group)
 }
 
+pub async fn add_group_members(
+    db: &DatabaseConnection,
+    group_id: i32,
+    user_ids: Vec<i32>,
+) -> Result<TryInsertResult<InsertResult<entity::auth_group_user::ActiveModel>>, anyhow::Error> {
+    let _ = match get_group_by_id(db, group_id).await? {
+        Some(group) => group,
+        None => return Err(anyhow!("Group does not exist")),
+    };
+
+    let new_member_ids = validate_group_members(db, group_id, user_ids).await?;
+
+    let new_members: Vec<entity::auth_group_user::ActiveModel> = new_member_ids
+        .clone()
+        .into_iter()
+        .map(|user_id| entity::auth_group_user::ActiveModel {
+            group_id: Set(group_id),
+            user_id: Set(user_id),
+            ..Default::default()
+        })
+        .collect();
+
+    let result = entity::prelude::AuthGroupUser::insert_many(new_members)
+        .on_empty_do_nothing()
+        .on_conflict(
+            OnConflict::columns(vec![
+                entity::auth_group_user::Column::GroupId,
+                entity::auth_group_user::Column::UserId,
+            ])
+            .do_nothing()
+            .to_owned(),
+        )
+        .exec(db)
+        .await?;
+
+    Ok(result)
+}
+
 pub async fn join_group(
     db: &DatabaseConnection,
     group_id: i32,
@@ -211,63 +249,11 @@ pub async fn join_group(
                 .await?;
 
             match result {
-                TryInsertResult::Conflicted => Err(anyhow!("Application already exists")),
+                TryInsertResult::Conflicted => Err(anyhow!("Application to join already exists")),
                 _ => Ok("Application submitted".to_string()),
             }
         }
     }
-}
-
-pub async fn add_group_members(
-    db: &DatabaseConnection,
-    group_id: i32,
-    user_ids: Vec<i32>,
-) -> Result<TryInsertResult<InsertResult<entity::auth_group_user::ActiveModel>>, anyhow::Error> {
-    let _ = match get_group_by_id(db, group_id).await? {
-        Some(group) => group,
-        None => return Err(anyhow!("Group does not exist")),
-    };
-
-    let new_member_ids = validate_group_members(db, group_id, user_ids).await?;
-
-    let new_members: Vec<entity::auth_group_user::ActiveModel> = new_member_ids
-        .clone()
-        .into_iter()
-        .map(|user_id| entity::auth_group_user::ActiveModel {
-            group_id: Set(group_id),
-            user_id: Set(user_id),
-            ..Default::default()
-        })
-        .collect();
-
-    let result = entity::prelude::AuthGroupUser::insert_many(new_members)
-        .on_empty_do_nothing()
-        .on_conflict(
-            OnConflict::columns(vec![
-                entity::auth_group_user::Column::GroupId,
-                entity::auth_group_user::Column::UserId,
-            ])
-            .do_nothing()
-            .to_owned(),
-        )
-        .exec(db)
-        .await?;
-
-    Ok(result)
-}
-
-pub async fn delete_group_members(
-    db: &DatabaseConnection,
-    group_id: i32,
-    user_ids: Vec<i32>,
-) -> Result<u64, DbErr> {
-    let result = entity::prelude::AuthGroupUser::delete_many()
-        .filter(entity::auth_group_user::Column::GroupId.eq(group_id))
-        .filter(entity::auth_group_user::Column::UserId.is_in(user_ids))
-        .exec(db)
-        .await?;
-
-    Ok(result.rows_affected)
 }
 
 pub async fn delete_group(db: &DatabaseConnection, group_id: i32) -> Result<Option<i32>, DbErr> {
@@ -285,5 +271,72 @@ pub async fn delete_group(db: &DatabaseConnection, group_id: i32) -> Result<Opti
         Ok(Some(group_id))
     } else {
         Ok(None)
+    }
+}
+
+pub async fn delete_group_members(
+    db: &DatabaseConnection,
+    group_id: i32,
+    user_ids: Vec<i32>,
+) -> Result<u64, DbErr> {
+    // validate filters for group type auto
+
+    let result = entity::prelude::AuthGroupUser::delete_many()
+        .filter(entity::auth_group_user::Column::GroupId.eq(group_id))
+        .filter(entity::auth_group_user::Column::UserId.is_in(user_ids))
+        .exec(db)
+        .await?;
+
+    Ok(result.rows_affected)
+}
+
+pub async fn leave_group(
+    db: &DatabaseConnection,
+    group_id: i32,
+    user_id: i32,
+    application_text: Option<String>,
+) -> Result<(), anyhow::Error> {
+    let group = match get_group_by_id(db, group_id).await? {
+        Some(group) => group,
+        None => return Err(anyhow!("Group does not exist")),
+    };
+
+    match group.group_type {
+        GroupType::Open | GroupType::Auto => {
+            let result = delete_group_members(db, group_id, vec![user_id]).await?;
+
+            if result == 0 {
+                return Err(anyhow!("User is not a member of the group"));
+            }
+
+            Ok(())
+        }
+        GroupType::Apply | GroupType::Hidden => {
+            let application = entity::auth_group_application::ActiveModel {
+                group_id: Set(group_id),
+                user_id: Set(user_id),
+                application_type: Set(GroupApplicationType::LeaveRequest),
+                application_text: Set(application_text),
+                ..Default::default()
+            };
+
+            let result = entity::prelude::AuthGroupApplication::insert(application)
+                .on_empty_do_nothing()
+                .on_conflict(
+                    OnConflict::columns(vec![
+                        entity::auth_group_application::Column::GroupId,
+                        entity::auth_group_application::Column::UserId,
+                    ])
+                    .do_nothing()
+                    .to_owned(),
+                )
+                .exec(db)
+                .await?;
+
+            match result {
+                TryInsertResult::Conflicted => Err(anyhow!("Application to leave already exists")),
+                _ => Ok(()),
+            }
+        }
     }
 }
