@@ -15,16 +15,16 @@ use crate::auth::permissions::require_permissions;
 
 pub fn group_member_routes() -> Router {
     Router::new()
-        .route("/:id/join", post(join_group))
-        .route("/:id/leave", delete(leave_group))
-        .route("/:id/members", get(get_group_members))
-        .route("/:id/members", post(add_group_members))
-        .route("/:id/members", delete(delete_group_members))
+        .route("/:group_id/join", post(join_group))
+        .route("/:group_id/leave", delete(leave_group))
+        .route("/:group_id/members", get(get_group_members))
+        .route("/:group_id/members", post(add_group_members))
+        .route("/:group_id/members", delete(delete_group_members))
 }
 
 #[utoipa::path(
     post,
-    path = "/groups/{id}/join",
+    path = "/groups/{group_id}/join",
     responses(
         (status = 200, description = "Joined/applied successfully", body = GroupDto),
         (status = 403, description = "Forbidden", body = String),
@@ -71,7 +71,7 @@ pub async fn join_group(
 
 #[utoipa::path(
     delete,
-    path = "/groups/{id}/leave",
+    path = "/groups/{group_id}/leave",
     responses(
         (status = 200, description = "Left/sent request to leave successfully", body = GroupDto),
         (status = 403, description = "Forbidden", body = String),
@@ -116,7 +116,7 @@ pub async fn leave_group(
 
 #[utoipa::path(
     get,
-    path = "/groups/{id}/members",
+    path = "/groups/{group_id}/members",
     responses(
         (status = 200, description = "Group members", body = Vec<UserDto>),
         (status = 403, description = "Insufficient permissions", body = String),
@@ -149,7 +149,7 @@ pub async fn get_group_members(
 
 #[utoipa::path(
     post,
-    path = "/groups/{id}/members",
+    path = "/groups/{group_id}/members",
     responses(
         (status = 200, description = "Users added successfully", body = GroupDto),
         (status = 403, description = "Forbidden", body = String),
@@ -189,7 +189,7 @@ pub async fn add_group_members(
 
 #[utoipa::path(
     delete,
-    path = "/groups/{id}/members",
+    path = "/groups/{group_id}/members",
     responses(
         (status = 200, description = "Users removed successfully", body = GroupDto),
         (status = 403, description = "Insufficient permissions", body = String),

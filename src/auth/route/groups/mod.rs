@@ -25,10 +25,10 @@ pub fn group_routes() -> Router {
     Router::new()
         .route("/", post(create_group))
         .route("/", get(get_groups))
-        .route("/:id", get(get_group_by_id))
-        .route("/:id", put(update_group))
-        .route("/:id", delete(delete_group))
-        .route("/:id/filters", get(get_group_filters))
+        .route("/:group_id", get(get_group_by_id))
+        .route("/:group_id", put(update_group))
+        .route("/:group_id", delete(delete_group))
+        .route("/:group_id/filters", get(get_group_filters))
         .nest("", group_member_routes())
         .nest("", group_application_routes())
 }
@@ -110,7 +110,7 @@ pub async fn get_groups(
 
 #[utoipa::path(
     get,
-    path = "/groups/{id}",
+    path = "/groups/{group_id}",
     responses(
         (status = 200, description = "Group info", body = GroupDto),
         (status = 403, description = "Insufficient permissions", body = String),
@@ -146,7 +146,7 @@ pub async fn get_group_by_id(
 
 #[utoipa::path(
     get,
-    path = "/groups/{id}/filters",
+    path = "/groups/{group_id}/filters",
     responses(
         (status = 200, description = "Group filters", body = Vec<GroupFiltersDto>),
         (status = 403, description = "Insufficient permissions", body = String),
@@ -182,7 +182,7 @@ pub async fn get_group_filters(
 
 #[utoipa::path(
     put,
-    path = "/groups/{id}",
+    path = "/groups/{group_id}",
     responses(
         (status = 200, description = "Updated group info", body = GroupDto),
         (status = 403, description = "Insufficient permissions", body = String),
@@ -226,7 +226,7 @@ pub async fn update_group(
 
 #[utoipa::path(
     delete,
-    path = "/groups/{id}",
+    path = "/groups/{group_id}",
     responses(
         (status = 200, description = "Group deleted successfully", body = GroupDto),
         (status = 403, description = "Insufficient permissions", body = String),

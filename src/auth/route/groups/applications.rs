@@ -17,16 +17,22 @@ use crate::auth::permissions::require_permissions;
 pub fn group_application_routes() -> Router {
     Router::new()
         .route(
-            "/:id/applications/:application_type",
+            "/:group_id/applications/:application_type",
             get(get_group_applications),
         )
-        .route("/application/:i32", put(update_group_application))
-        .route("/application/:i32", delete(delete_group_application))
+        .route(
+            "/application/:application_id",
+            put(update_group_application),
+        )
+        .route(
+            "/application/:application_id",
+            delete(delete_group_application),
+        )
 }
 
 #[utoipa::path(
     get,
-    path = "/groups/{id}/applications/{application_type}",
+    path = "/groups/{group_id}/applications/{application_type}",
     responses(
         (status = 200, description = "Outstanding join applications", body = GroupDto),
         (status = 403, description = "Insufficient permissions", body = String),
@@ -71,7 +77,7 @@ pub async fn get_group_applications(
 
 #[utoipa::path(
     put,
-    path = "/groups/application/{id}",
+    path = "/groups/application/{application_id}",
     responses(
         (status = 200, description = "Successfully updated application", body = GroupDto),
         (status = 403, description = "Insufficient permissions", body = String),
@@ -134,7 +140,7 @@ pub async fn update_group_application(
 
 #[utoipa::path(
     delete,
-    path = "/groups/application/{id}",
+    path = "/groups/application/{application_id}",
     responses(
         (status = 200, description = "Successfully deleted application", body = GroupDto),
         (status = 403, description = "Insufficient permissions", body = String),
