@@ -3,7 +3,7 @@ pub mod filters;
 use std::collections::HashMap;
 
 use anyhow::anyhow;
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use migration::OnConflict;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DbErr, DeleteResult,
@@ -340,7 +340,7 @@ pub async fn join_group(
     group_id: i32,
     user_id: i32,
     application_text: Option<String>,
-) -> Result<String, anyhow::Error> {
+) -> Result<Option<GroupApplicationDto>, anyhow::Error> {
     let group = match get_group_by_id(db, group_id).await? {
         Some(group) => group,
         None => return Err(anyhow!("Group does not exist")),
@@ -352,7 +352,7 @@ pub async fn join_group(
 
             match result {
                 TryInsertResult::Conflicted => Err(anyhow!("Already a member")),
-                _ => Ok("Successfully joined group".to_string()),
+                _ => Ok(None),
             }
         }
         GroupType::Apply | GroupType::Hidden => {
@@ -384,8 +384,26 @@ pub async fn join_group(
                 .await?;
 
             match result {
+                TryInsertResult::Inserted(result) => {
+                    let mut application = get_group_application(
+                        db,
+                        None,
+                        None,
+                        Some(result.last_insert_id),
+                        None,
+                        None,
+                    )
+                    .await?;
+
+                    match application.pop() {
+                        Some(application) => Ok(Some(application)),
+                        None => Err(anyhow!(
+                            "There was an error returning group application details"
+                        )),
+                    }
+                }
                 TryInsertResult::Conflicted => Err(anyhow!("Application to join already exists")),
-                _ => Ok("Application submitted".to_string()),
+                TryInsertResult::Empty => Err(anyhow!("Invalid application")),
             }
         }
     }

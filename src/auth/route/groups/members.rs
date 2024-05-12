@@ -48,16 +48,23 @@ pub async fn join_group(
     };
 
     match data::groups::join_group(&db, group_id.0, user_id, application_text.0).await {
-        Ok(message) => (StatusCode::OK, message).into_response(),
+        Ok(application) => match application {
+            Some(application) => (StatusCode::OK, Json(application)).into_response(),
+            None => (StatusCode::OK, "Joined group successfully").into_response(),
+        },
         Err(err) => {
             if err.to_string() == "Application to join already exists"
                 || err.to_string() == "Already a member"
             {
                 return (StatusCode::CONFLICT, err.to_string()).into_response();
-            } else if err.to_string() == "User does not meet group requirements" {
+            } else if err.to_string() == "User does not meet group requirements"
+                || err.to_string() == "Invalid application"
+            {
                 return (StatusCode::BAD_REQUEST, err.to_string()).into_response();
             } else if err.to_string() == "Group does not exist" {
                 return (StatusCode::NOT_FOUND, err.to_string()).into_response();
+            } else if err.to_string() == "There was an error returning group application details" {
+                return (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response();
             }
 
             (
