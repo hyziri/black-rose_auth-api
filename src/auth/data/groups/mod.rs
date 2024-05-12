@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use anyhow::anyhow;
 use migration::OnConflict;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
-    InsertResult, QueryFilter, TryInsertResult,
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DbErr, DeleteResult,
+    EntityTrait, InsertResult, QueryFilter, TryInsertResult,
 };
 
 use crate::{
@@ -257,16 +257,26 @@ pub async fn update_group(
 
 pub async fn update_group_application(
     db: &DatabaseConnection,
-    id: i32,
+    application_id: i32,
     application_text: Option<String>,
-) -> Result<GroupApplication, sea_orm::DbErr> {
-    let application = entity::auth_group_application::ActiveModel {
-        id: Set(id),
-        application_text: Set(application_text),
-        ..Default::default()
-    };
+) -> Result<GroupApplication, anyhow::Error> {
+    let application = entity::prelude::AuthGroupApplication::find()
+        .filter(entity::auth_group_application::Column::Id.eq(application_id))
+        .one(db)
+        .await?;
 
-    application.update(db).await
+    match application {
+        Some(application) => {
+            let mut application: entity::auth_group_application::ActiveModel = application.into();
+
+            application.application_text = Set(application_text);
+
+            let application = application.update(db).await?;
+
+            Ok(application)
+        }
+        None => Err(anyhow!("Application not found")),
+    }
 }
 
 pub async fn add_group_members(
@@ -446,4 +456,15 @@ pub async fn leave_group(
             }
         }
     }
+}
+
+pub async fn delete_group_application(
+    db: &DatabaseConnection,
+    application_id: i32,
+) -> Result<DeleteResult, DbErr> {
+    let result = entity::prelude::AuthGroupApplication::delete_by_id(application_id)
+        .exec(db)
+        .await?;
+
+    Ok(result)
 }
