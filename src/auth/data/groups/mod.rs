@@ -1,5 +1,6 @@
 pub mod filters;
 
+use anyhow::anyhow;
 use migration::OnConflict;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
@@ -17,7 +18,10 @@ use crate::{
     eve::data::character::bulk_get_characters,
 };
 
-use entity::{auth_group::Model as Group, sea_orm_active_enums::GroupType};
+use entity::{
+    auth_group::Model as Group,
+    sea_orm_active_enums::{GroupApplicationType, GroupType},
+};
 
 use filters::validate_group_filters;
 
@@ -158,68 +162,96 @@ pub async fn update_group(
     Ok(updated_group)
 }
 
+pub async fn join_group(
+    db: &DatabaseConnection,
+    group_id: i32,
+    user_id: i32,
+    application_text: Option<String>,
+) -> Result<String, anyhow::Error> {
+    let group = match get_group_by_id(db, group_id).await? {
+        Some(group) => group,
+        None => return Err(anyhow!("Group does not exist")),
+    };
+
+    match group.group_type {
+        GroupType::Open | GroupType::Auto => {
+            let result = add_group_members(db, group_id, vec![user_id]).await?;
+
+            match result {
+                TryInsertResult::Conflicted => Err(anyhow!("Already a member")),
+                _ => Ok("Successfully joined group".to_string()),
+            }
+        }
+        GroupType::Apply | GroupType::Hidden => {
+            let filter_result = validate_group_members(db, group_id, vec![user_id]).await?;
+
+            if filter_result.is_empty() {
+                return Err(anyhow!("User does not meet group requirements"));
+            }
+
+            let application = entity::auth_group_application::ActiveModel {
+                group_id: Set(group_id),
+                user_id: Set(user_id),
+                application_type: Set(GroupApplicationType::JoinRequest),
+                application_text: Set(application_text),
+                ..Default::default()
+            };
+
+            let result = entity::prelude::AuthGroupApplication::insert(application)
+                .on_empty_do_nothing()
+                .on_conflict(
+                    OnConflict::columns(vec![
+                        entity::auth_group_application::Column::GroupId,
+                        entity::auth_group_application::Column::UserId,
+                    ])
+                    .do_nothing()
+                    .to_owned(),
+                )
+                .exec(db)
+                .await?;
+
+            match result {
+                TryInsertResult::Conflicted => Err(anyhow!("Application already exists")),
+                _ => Ok("Application submitted".to_string()),
+            }
+        }
+    }
+}
+
 pub async fn add_group_members(
     db: &DatabaseConnection,
     group_id: i32,
     user_ids: Vec<i32>,
-    skip_applications: bool,
-) -> Result<TryInsertResult<InsertResult<entity::auth_group_user::ActiveModel>>, DbErr> {
-    async fn add_members(
-        db: &DatabaseConnection,
-        group_id: i32,
-        user_ids: Vec<i32>,
-    ) -> Result<TryInsertResult<InsertResult<entity::auth_group_user::ActiveModel>>, DbErr> {
-        let new_members: Vec<entity::auth_group_user::ActiveModel> = user_ids
-            .clone()
-            .into_iter()
-            .map(|user_id| entity::auth_group_user::ActiveModel {
-                group_id: Set(group_id),
-                user_id: Set(user_id),
-                ..Default::default()
-            })
-            .collect();
-
-        let result = entity::prelude::AuthGroupUser::insert_many(new_members)
-            .on_empty_do_nothing()
-            .on_conflict(
-                OnConflict::columns(vec![
-                    entity::auth_group_user::Column::GroupId,
-                    entity::auth_group_user::Column::UserId,
-                ])
-                .do_nothing()
-                .to_owned(),
-            )
-            .exec(db)
-            .await?;
-
-        Ok(result)
-    }
-
-    async fn add_applications(
-        db: &DatabaseConnection,
-        group_id: i32,
-        user_ids: Vec<i32>,
-    ) -> Result<TryInsertResult<InsertResult<entity::auth_group_user::ActiveModel>>, DbErr> {
-        todo!();
-    }
-
-    let group = match get_group_by_id(db, group_id).await? {
+) -> Result<TryInsertResult<InsertResult<entity::auth_group_user::ActiveModel>>, anyhow::Error> {
+    let _ = match get_group_by_id(db, group_id).await? {
         Some(group) => group,
-        None => return Err(DbErr::RecordNotFound("Group does not exist".to_string())),
+        None => return Err(anyhow!("Group does not exist")),
     };
 
     let new_member_ids = validate_group_members(db, group_id, user_ids).await?;
 
-    let result = match group.group_type {
-        GroupType::Open | GroupType::Auto => add_members(db, group_id, new_member_ids).await?,
-        GroupType::Apply | GroupType::Hidden => {
-            if skip_applications {
-                add_members(db, group_id, new_member_ids).await?
-            } else {
-                add_applications(db, group_id, new_member_ids).await?
-            }
-        }
-    };
+    let new_members: Vec<entity::auth_group_user::ActiveModel> = new_member_ids
+        .clone()
+        .into_iter()
+        .map(|user_id| entity::auth_group_user::ActiveModel {
+            group_id: Set(group_id),
+            user_id: Set(user_id),
+            ..Default::default()
+        })
+        .collect();
+
+    let result = entity::prelude::AuthGroupUser::insert_many(new_members)
+        .on_empty_do_nothing()
+        .on_conflict(
+            OnConflict::columns(vec![
+                entity::auth_group_user::Column::GroupId,
+                entity::auth_group_user::Column::UserId,
+            ])
+            .do_nothing()
+            .to_owned(),
+        )
+        .exec(db)
+        .await?;
 
     Ok(result)
 }

@@ -339,11 +339,7 @@ impl MigrationTrait for Migration {
             .create_type(
                 Type::create()
                     .as_enum(Alias::new("group_application_type"))
-                    .values([
-                        Alias::new("JoinRequest"),
-                        Alias::new("LeaveRequest"),
-                        Alias::new("Invitation"),
-                    ])
+                    .values([Alias::new("JoinRequest"), Alias::new("LeaveRequest")])
                     .to_owned(),
             )
             .await?;
@@ -374,11 +370,7 @@ impl MigrationTrait for Migration {
                         ColumnDef::new(AuthGroupApplication::ApplicationType)
                             .enumeration(
                                 Alias::new("group_application_type"),
-                                [
-                                    Alias::new("JoinRequest"),
-                                    Alias::new("LeaveRequest"),
-                                    Alias::new("Invitation"),
-                                ],
+                                [Alias::new("JoinRequest"), Alias::new("LeaveRequest")],
                             )
                             .not_null(),
                     )
@@ -695,7 +687,7 @@ enum AuthGroupApplication {
     Id,
     GroupId,
     UserId,
-    ApplicationType, // JoinRequest, LeaveRequest, Invitation
+    ApplicationType, // JoinRequest, LeaveRequest
     ApplicationText,
     Created,
 }
