@@ -176,6 +176,10 @@ pub async fn delete_group_application(
 
     match data::groups::get_group_application(&db, None, None, Some(path.0), None, None).await {
         Ok(application) => {
+            if application.is_empty() {
+                return (StatusCode::NOT_FOUND, "Application does not exist").into_response();
+            };
+
             if application[0].user_id != user_id {
                 return (
                     StatusCode::FORBIDDEN,
