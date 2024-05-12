@@ -271,7 +271,9 @@ pub async fn update_group(
 pub async fn update_group_application(
     db: &DatabaseConnection,
     application_id: i32,
-    application_text: Option<String>,
+    application_request_message: Option<String>,
+    application_response_message: Option<String>,
+    application_status: Option<GroupApplicationStatus>,
 ) -> Result<GroupApplication, anyhow::Error> {
     let application = entity::prelude::AuthGroupApplication::find()
         .filter(entity::auth_group_application::Column::Id.eq(application_id))
@@ -286,7 +288,28 @@ pub async fn update_group_application(
 
             let mut application: entity::auth_group_application::ActiveModel = application.into();
 
-            application.application_request_message = Set(application_text);
+            if let Some(application_request_message) = application_request_message {
+                if application_request_message.is_empty() {
+                    application.application_request_message = Set(None);
+                } else {
+                    application.application_request_message =
+                        Set(Some(application_request_message));
+                }
+            }
+
+            if let Some(application_response_message) = application_response_message {
+                if application_response_message.is_empty() {
+                    application.application_response_message = Set(None);
+                } else {
+                    application.application_request_message =
+                        Set(Some(application_response_message));
+                }
+            }
+
+            if let Some(application_status) = application_status {
+                application.application_status = Set(application_status);
+            }
+
             application.last_updated = Set(Utc::now().naive_utc());
 
             let application = application.update(db).await?;
@@ -432,8 +455,11 @@ pub async fn delete_group_members(
     db: &DatabaseConnection,
     group_id: i32,
     user_ids: Vec<i32>,
-) -> Result<DeleteResult, DbErr> {
-    // validate filters for group type auto
+) -> Result<DeleteResult, anyhow::Error> {
+    let _ = match get_group_by_id(db, group_id).await? {
+        Some(group) => group,
+        None => return Err(anyhow!("Group does not exist")),
+    };
 
     let result = entity::prelude::AuthGroupUser::delete_many()
         .filter(entity::auth_group_user::Column::GroupId.eq(group_id))

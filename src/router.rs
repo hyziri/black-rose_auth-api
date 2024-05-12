@@ -2,12 +2,12 @@ use axum::Router;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-use crate::auth::model::{
+use crate::auth::{model::{
     groups::{
         GroupApplicationDto, GroupApplicationStatus, GroupApplicationType, GroupDto, GroupFilterCriteria, GroupFilterCriteriaType, GroupFilterGroupDto, GroupFilterRuleDto, GroupFilterType, GroupFiltersDto, GroupType, NewGroupDto, NewGroupFilterGroupDto, NewGroupFilterRuleDto, UpdateGroupDto, UpdateGroupFilterGroupDto, UpdateGroupFilterRuleDto
     },
     user::UserDto,
-};
+}, route::groups::applications::ApplicationAction};
 use crate::auth::route::{auth, groups, user};
 use crate::eve::model::character::CharacterAffiliationDto;
 
@@ -23,7 +23,7 @@ pub fn routes() -> Router {
             groups::members::join_group, groups::members::leave_group,
             groups::members::get_group_members, groups::members::add_group_members, groups::members::delete_group_members,
             groups::applications::get_group_applications, groups::applications::update_group_application, 
-            groups::applications::delete_group_application,
+            groups::applications::delete_group_application, groups::applications::accept_reject_application,
         ),
         components(schemas(
             UserDto, CharacterAffiliationDto, 
@@ -31,7 +31,7 @@ pub fn routes() -> Router {
             GroupFiltersDto, GroupDto, GroupFilterRuleDto, GroupFilterGroupDto, 
             UpdateGroupDto, UpdateGroupFilterRuleDto, UpdateGroupFilterGroupDto,
             GroupType, GroupFilterType, GroupFilterCriteria, GroupFilterCriteriaType,
-            GroupApplicationDto, GroupApplicationStatus, GroupApplicationType)),
+            GroupApplicationDto, GroupApplicationStatus, GroupApplicationType, ApplicationAction)),
         tags(
             (name = "Black Rose Auth API", description = "Black Rose Auth API endpoints")
         )
