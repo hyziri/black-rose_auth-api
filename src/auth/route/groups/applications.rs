@@ -146,8 +146,15 @@ pub async fn update_group_application(
 
     let request_message = application_request_message.0.unwrap_or_default();
 
-    match data::groups::update_group_application(&db, path.0, Some(request_message), None, None)
-        .await
+    match data::groups::update_group_application(
+        &db,
+        path.0,
+        Some(request_message),
+        None,
+        None,
+        None,
+    )
+    .await
     {
         Ok(_) => (StatusCode::OK, "Successfully updated application").into_response(),
         Err(err) => {
@@ -265,7 +272,7 @@ pub async fn accept_reject_application(
     Path(path): Path<(i32, ApplicationAction)>,
     application_response_message: Json<Option<String>>,
 ) -> Response {
-    let _ = match require_permissions(&db, session).await {
+    let responder_id = match require_permissions(&db, session).await {
         Ok(user_id) => user_id,
         Err(response) => return response,
     };
@@ -283,6 +290,7 @@ pub async fn accept_reject_application(
         None,
         Some(response_message),
         Some(application_action.clone()),
+        Some(responder_id),
     )
     .await
     {
@@ -308,7 +316,7 @@ pub async fn accept_reject_application(
         return (StatusCode::OK, "Successfully rejected application").into_response();
     }
 
-    match application.application_type {
+    match application.request_type {
         entity::sea_orm_active_enums::GroupApplicationType::Join => {
             match add_group_members(&db, application.group_id, vec![application.user_id]).await {
                 Ok(_) => {

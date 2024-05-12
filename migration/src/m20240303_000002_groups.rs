@@ -386,7 +386,7 @@ impl MigrationTrait for Migration {
                             .not_null(),
                     )
                     .col(
-                        ColumnDef::new(AuthGroupApplication::ApplicationType)
+                        ColumnDef::new(AuthGroupApplication::RequestType)
                             .enumeration(
                                 Alias::new("group_application_type"),
                                 [Alias::new("Join"), Alias::new("Leave")],
@@ -394,7 +394,7 @@ impl MigrationTrait for Migration {
                             .not_null(),
                     )
                     .col(
-                        ColumnDef::new(AuthGroupApplication::ApplicationStatus)
+                        ColumnDef::new(AuthGroupApplication::Status)
                             .enumeration(
                                 Alias::new("group_application_status"),
                                 [
@@ -406,8 +406,9 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default("Outstanding"),
                     )
-                    .col(ColumnDef::new(AuthGroupApplication::ApplicationRequestMessage).text())
-                    .col(ColumnDef::new(AuthGroupApplication::ApplicationResponseMessage).text())
+                    .col(ColumnDef::new(AuthGroupApplication::RequestMessage).text())
+                    .col(ColumnDef::new(AuthGroupApplication::ResponseMessage).text())
+                    .col(ColumnDef::new(AuthGroupApplication::Responder).integer())
                     .col(
                         ColumnDef::new(AuthGroupApplication::Created)
                             .timestamp()
@@ -470,10 +471,31 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
+        manager
+            .create_foreign_key(
+                sea_query::ForeignKey::create()
+                    .name("fk-auth_group_application_responder-user_id")
+                    .from_tbl(AuthGroupApplication::Table)
+                    .from_col(AuthGroupApplication::Responder)
+                    .to_tbl(AuthUser::Table)
+                    .to_col(AuthUser::Id)
+                    .to_owned(),
+            )
+            .await?;
+
         Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_foreign_key(
+                sea_query::ForeignKey::drop()
+                    .name("fk-auth_group_application_responder-user_id")
+                    .table(AuthGroupApplication::Table)
+                    .to_owned(),
+            )
+            .await?;
+
         manager
             .drop_foreign_key(
                 sea_query::ForeignKey::drop()
@@ -714,10 +736,11 @@ enum AuthGroupApplication {
     Id,
     GroupId,
     UserId,
-    ApplicationType,   // JoinRequest, LeaveRequest
-    ApplicationStatus, // Outstanding, Accepted, Rejected
-    ApplicationRequestMessage,
-    ApplicationResponseMessage, // Message for application accepted/rejected
+    RequestType, // JoinRequest, LeaveRequest
+    Status,      // Outstanding, Accepted, Rejected
+    RequestMessage,
+    ResponseMessage, // Message for application accepted/rejected
+    Responder,
     Created,
     LastUpdated,
 }

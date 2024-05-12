@@ -1,6 +1,6 @@
 pub mod filters;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use anyhow::anyhow;
 use chrono::{DateTime, Utc};
@@ -161,15 +161,13 @@ pub async fn get_group_application(
     let mut query = entity::prelude::AuthGroupApplication::find();
 
     if let Some(application_type) = application_type {
-        query = query.filter(
-            entity::auth_group_application::Column::ApplicationType.eq(Some(application_type)),
-        );
+        query = query
+            .filter(entity::auth_group_application::Column::RequestType.eq(Some(application_type)));
     }
 
     if let Some(application_status) = application_status {
-        query = query.filter(
-            entity::auth_group_application::Column::ApplicationStatus.eq(Some(application_status)),
-        );
+        query = query
+            .filter(entity::auth_group_application::Column::Status.eq(Some(application_status)));
     }
 
     if let Some(application_id) = application_id {
@@ -186,10 +184,18 @@ pub async fn get_group_application(
 
     let applications = query.all(db).await?;
 
-    let user_ids = applications
+    let user_ids: HashSet<i32> = applications
         .iter()
-        .map(|app| app.user_id)
-        .collect::<Vec<i32>>();
+        .flat_map(|app| {
+            let mut ids = vec![app.user_id];
+            if let Some(responder_id) = app.responder {
+                ids.push(responder_id);
+            }
+            ids.into_iter()
+        })
+        .collect();
+    let user_ids: Vec<i32> = user_ids.into_iter().collect();
+
     let mains = bulk_get_user_main_characters(db, user_ids).await?;
 
     let character_ids = mains
@@ -198,10 +204,6 @@ pub async fn get_group_application(
         .collect::<Vec<i32>>();
     let affiliations = bulk_get_character_affiliations(db, character_ids).await?;
 
-    let mut affiliations_map: HashMap<i32, _> = affiliations
-        .into_iter()
-        .map(|affiliation| (affiliation.character_id, affiliation))
-        .collect();
     let mut applications_map: HashMap<i32, _> = applications
         .into_iter()
         .map(|app| (app.user_id, app))
@@ -209,20 +211,42 @@ pub async fn get_group_application(
 
     let mut group_applications = vec![];
 
-    for main in mains {
+    for main in mains.clone() {
         if let (Some(character), Some(application)) = (
-            affiliations_map.remove(&main.character_id),
+            affiliations
+                .iter()
+                .find(|affiliation| affiliation.character_id == main.character_id),
             applications_map.remove(&main.user_id),
         ) {
+            let mut responder_info = None;
+
+            if let Some(responder) = application.responder {
+                let main_character = mains
+                    .iter()
+                    .find(|main| main.user_id == responder)
+                    .map(|main| main.character_id);
+
+                if let Some(main_character) = main_character {
+                    let responder_character = affiliations
+                        .iter()
+                        .find(|affiliation| affiliation.character_id == main_character);
+
+                    if let Some(responder_character) = responder_character {
+                        responder_info = Some(responder_character.clone());
+                    }
+                }
+            };
+
             let group_application = GroupApplicationDto {
                 id: application.id,
                 group_id: application.group_id,
                 user_id: application.user_id,
-                character_info: character,
-                application_status: application.application_status.into(),
-                application_type: application.application_type.into(),
-                application_request_message: application.application_request_message,
-                application_response_message: application.application_response_message,
+                applicant_info: character.clone(),
+                responder_info,
+                status: application.status.into(),
+                request_type: application.request_type.into(),
+                request_message: application.request_message,
+                response_message: application.response_message,
                 created: DateTime::from_naive_utc_and_offset(application.created, Utc),
                 last_updated: DateTime::from_naive_utc_and_offset(application.last_updated, Utc),
             };
@@ -276,6 +300,7 @@ pub async fn update_group_application(
     application_request_message: Option<String>,
     application_response_message: Option<String>,
     application_status: Option<GroupApplicationStatus>,
+    application_responder: Option<i32>,
 ) -> Result<GroupApplication, anyhow::Error> {
     let application = entity::prelude::AuthGroupApplication::find()
         .filter(entity::auth_group_application::Column::Id.eq(application_id))
@@ -284,7 +309,7 @@ pub async fn update_group_application(
 
     match application {
         Some(application) => {
-            if application.application_status != GroupApplicationStatus::Outstanding {
+            if application.status != GroupApplicationStatus::Outstanding {
                 return Err(anyhow!("Not allowed to update a completed application"));
             }
 
@@ -292,24 +317,26 @@ pub async fn update_group_application(
 
             if let Some(application_request_message) = application_request_message {
                 if application_request_message.is_empty() {
-                    application.application_request_message = Set(None);
+                    application.request_message = Set(None);
                 } else {
-                    application.application_request_message =
-                        Set(Some(application_request_message));
+                    application.request_message = Set(Some(application_request_message));
                 }
             }
 
             if let Some(application_response_message) = application_response_message {
                 if application_response_message.is_empty() {
-                    application.application_response_message = Set(None);
+                    application.response_message = Set(None);
                 } else {
-                    application.application_request_message =
-                        Set(Some(application_response_message));
+                    application.request_message = Set(Some(application_response_message));
                 }
             }
 
             if let Some(application_status) = application_status {
-                application.application_status = Set(application_status);
+                application.status = Set(application_status);
+            }
+
+            if let Some(application_responder) = application_responder {
+                application.responder = Set(Some(application_responder));
             }
 
             application.last_updated = Set(Utc::now().naive_utc());
@@ -364,7 +391,7 @@ pub async fn join_group(
     db: &DatabaseConnection,
     group_id: i32,
     user_id: i32,
-    application_text: Option<String>,
+    request_message: Option<String>,
 ) -> Result<Option<GroupApplicationDto>, anyhow::Error> {
     let group = match get_group_by_id(db, group_id).await? {
         Some(group) => group,
@@ -391,11 +418,11 @@ pub async fn join_group(
                 .filter(entity::auth_group_application::Column::GroupId.eq(group_id))
                 .filter(entity::auth_group_application::Column::UserId.eq(user_id))
                 .filter(
-                    entity::auth_group_application::Column::ApplicationStatus
+                    entity::auth_group_application::Column::Status
                         .eq(GroupApplicationStatus::Outstanding),
                 )
                 .filter(
-                    entity::auth_group_application::Column::ApplicationType
+                    entity::auth_group_application::Column::RequestType
                         .eq(GroupApplicationType::Join),
                 )
                 .one(db)
@@ -408,8 +435,8 @@ pub async fn join_group(
             let application = entity::auth_group_application::ActiveModel {
                 group_id: Set(group_id),
                 user_id: Set(user_id),
-                application_type: Set(GroupApplicationType::Join),
-                application_request_message: Set(application_text),
+                request_type: Set(GroupApplicationType::Join),
+                request_message: Set(request_message),
                 ..Default::default()
             };
 
@@ -477,7 +504,7 @@ pub async fn leave_group(
     db: &DatabaseConnection,
     group_id: i32,
     user_id: i32,
-    application_text: Option<String>,
+    request_message: Option<String>,
 ) -> Result<Option<GroupApplicationDto>, anyhow::Error> {
     let group = match get_group_by_id(db, group_id).await? {
         Some(group) => group,
@@ -499,12 +526,11 @@ pub async fn leave_group(
             .filter(entity::auth_group_application::Column::GroupId.eq(group_id))
             .filter(entity::auth_group_application::Column::UserId.eq(user_id))
             .filter(
-                entity::auth_group_application::Column::ApplicationStatus
+                entity::auth_group_application::Column::Status
                     .eq(GroupApplicationStatus::Outstanding),
             )
             .filter(
-                entity::auth_group_application::Column::ApplicationType
-                    .eq(GroupApplicationType::Leave),
+                entity::auth_group_application::Column::RequestType.eq(GroupApplicationType::Leave),
             )
             .one(db)
             .await?;
@@ -516,8 +542,8 @@ pub async fn leave_group(
         let application = entity::auth_group_application::ActiveModel {
             group_id: Set(group_id),
             user_id: Set(user_id),
-            application_type: Set(GroupApplicationType::Leave),
-            application_request_message: Set(application_text),
+            request_type: Set(GroupApplicationType::Leave),
+            request_message: Set(request_message),
             ..Default::default()
         };
 
@@ -545,7 +571,7 @@ pub async fn delete_group_application(
 
     match application {
         Some(application) => {
-            if application.application_status != GroupApplicationStatus::Outstanding {
+            if application.status != GroupApplicationStatus::Outstanding {
                 return Err(anyhow!("Not allowed to delete a completed application"));
             }
 

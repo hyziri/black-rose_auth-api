@@ -12,12 +12,13 @@ pub struct Model {
     pub id: i32,
     pub group_id: i32,
     pub user_id: i32,
-    pub application_type: GroupApplicationType,
-    pub application_status: GroupApplicationStatus,
+    pub request_type: GroupApplicationType,
+    pub status: GroupApplicationStatus,
     #[sea_orm(column_type = "Text", nullable)]
-    pub application_request_message: Option<String>,
+    pub request_message: Option<String>,
     #[sea_orm(column_type = "Text", nullable)]
-    pub application_response_message: Option<String>,
+    pub response_message: Option<String>,
+    pub responder: Option<i32>,
     pub created: DateTime,
     pub last_updated: DateTime,
 }
@@ -39,18 +40,20 @@ pub enum Relation {
         on_update = "NoAction",
         on_delete = "NoAction"
     )]
-    AuthUser,
+    AuthUser2,
+    #[sea_orm(
+        belongs_to = "super::auth_user::Entity",
+        from = "Column::Responder",
+        to = "super::auth_user::Column::Id",
+        on_update = "NoAction",
+        on_delete = "NoAction"
+    )]
+    AuthUser1,
 }
 
 impl Related<super::auth_group::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::AuthGroup.def()
-    }
-}
-
-impl Related<super::auth_user::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::AuthUser.def()
     }
 }
 
