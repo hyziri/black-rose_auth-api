@@ -33,6 +33,7 @@ use self::filters::{
 };
 
 use super::user::{bulk_get_user_main_characters, get_user};
+use entity::auth_group_application::Model as GroupApplication;
 
 pub async fn create_group(
     db: &DatabaseConnection,
@@ -129,9 +130,10 @@ pub async fn get_group_members(
     Ok(characters)
 }
 
-pub async fn get_group_applications(
+pub async fn get_group_application(
     db: &DatabaseConnection,
     application_filter: Option<GroupApplicationType>,
+    application_id: Option<i32>,
     group_id: Option<i32>,
     user_id: Option<i32>,
 ) -> Result<Vec<GroupApplicationDto>, anyhow::Error> {
@@ -153,8 +155,17 @@ pub async fn get_group_applications(
         };
     };
 
-    let mut query = entity::prelude::AuthGroupApplication::find()
-        .filter(entity::auth_group_application::Column::ApplicationType.eq(application_filter));
+    let mut query = entity::prelude::AuthGroupApplication::find();
+
+    if let Some(application_filter) = application_filter {
+        query = query.filter(
+            entity::auth_group_application::Column::ApplicationType.eq(Some(application_filter)),
+        );
+    }
+
+    if let Some(application_id) = application_id {
+        query = query.filter(entity::auth_group_application::Column::Id.eq(Some(application_id)));
+    }
 
     if let Some(group_id) = group_id {
         query = query.filter(entity::auth_group_application::Column::GroupId.eq(Some(group_id)));
@@ -242,6 +253,20 @@ pub async fn update_group(
     // Queue update group members task
 
     Ok(updated_group)
+}
+
+pub async fn update_group_application(
+    db: &DatabaseConnection,
+    id: i32,
+    application_text: Option<String>,
+) -> Result<GroupApplication, sea_orm::DbErr> {
+    let application = entity::auth_group_application::ActiveModel {
+        id: Set(id),
+        application_text: Set(application_text),
+        ..Default::default()
+    };
+
+    application.update(db).await
 }
 
 pub async fn add_group_members(

@@ -24,7 +24,7 @@ pub fn routes() -> Router {
             groups::get_group_filters, groups::update_group, groups::delete_group,
             groups::join_group, groups::leave_group,
             groups::get_group_members, groups::add_group_members, groups::delete_group_members,
-            groups::get_group_applications
+            groups::get_group_applications, groups::update_group_application
         ),
         components(schemas(
             UserDto, CharacterAffiliationDto, 

@@ -21,6 +21,7 @@ use crate::auth::permissions::require_permissions;
 pub use self::members::{
     __path_add_group_members, __path_delete_group_members, __path_get_group_applications,
     __path_get_group_members, __path_join_group, __path_leave_group,
+    __path_update_group_application,
 };
 
 pub fn group_routes() -> Router {
