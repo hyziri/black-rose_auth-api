@@ -104,7 +104,10 @@ pub async fn leave_group(
     };
 
     match data::groups::leave_group(&db, group_id.0, user_id, application_text.0).await {
-        Ok(_) => (StatusCode::OK, "Left group successfully").into_response(),
+        Ok(application) => match application {
+            Some(application) => (StatusCode::OK, Json(application)).into_response(),
+            None => (StatusCode::OK, "Left group successfully").into_response(),
+        },
         Err(err) => {
             if err.to_string() == "Application to leave already exists"
                 || err.to_string() == "User is not a member of the group"
@@ -118,7 +121,7 @@ pub async fn leave_group(
 
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "Error adding user to group",
+                "Error leaving/requesting to leave group",
             )
                 .into_response()
         }

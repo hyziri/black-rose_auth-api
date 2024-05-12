@@ -385,6 +385,24 @@ pub async fn join_group(
                 return Err(anyhow!("User does not meet group requirements"));
             }
 
+            let duplicate_application = entity::prelude::AuthGroupApplication::find()
+                .filter(entity::auth_group_application::Column::GroupId.eq(group_id))
+                .filter(entity::auth_group_application::Column::UserId.eq(user_id))
+                .filter(
+                    entity::auth_group_application::Column::ApplicationStatus
+                        .eq(GroupApplicationStatus::Outstanding),
+                )
+                .filter(
+                    entity::auth_group_application::Column::ApplicationType
+                        .eq(GroupApplicationType::Join),
+                )
+                .one(db)
+                .await?;
+
+            if duplicate_application.is_some() {
+                return Err(anyhow!("Application to join already exists"));
+            }
+
             let application = entity::auth_group_application::ActiveModel {
                 group_id: Set(group_id),
                 user_id: Set(user_id),
@@ -393,41 +411,12 @@ pub async fn join_group(
                 ..Default::default()
             };
 
-            let result = entity::prelude::AuthGroupApplication::insert(application)
-                .on_empty_do_nothing()
-                .on_conflict(
-                    OnConflict::columns(vec![
-                        entity::auth_group_application::Column::GroupId,
-                        entity::auth_group_application::Column::UserId,
-                    ])
-                    .do_nothing()
-                    .to_owned(),
-                )
-                .exec(db)
-                .await?;
+            let application = application.insert(db).await?;
 
-            match result {
-                TryInsertResult::Inserted(result) => {
-                    let mut application = get_group_application(
-                        db,
-                        None,
-                        None,
-                        Some(result.last_insert_id),
-                        None,
-                        None,
-                    )
-                    .await?;
+            let application =
+                get_group_application(db, None, None, Some(application.id), None, None).await?;
 
-                    match application.pop() {
-                        Some(application) => Ok(Some(application)),
-                        None => Err(anyhow!(
-                            "There was an error returning group application details"
-                        )),
-                    }
-                }
-                TryInsertResult::Conflicted => Err(anyhow!("Application to join already exists")),
-                TryInsertResult::Empty => Err(anyhow!("Invalid application")),
-            }
+            Ok(application.into_iter().next())
         }
     }
 }
@@ -487,23 +476,47 @@ pub async fn leave_group(
     group_id: i32,
     user_id: i32,
     application_text: Option<String>,
-) -> Result<(), anyhow::Error> {
+) -> Result<Option<GroupApplicationDto>, anyhow::Error> {
     let group = match get_group_by_id(db, group_id).await? {
         Some(group) => group,
         None => return Err(anyhow!("Group does not exist")),
     };
 
+    let current_user = entity::prelude::AuthGroupUser::find()
+        .filter(entity::auth_group_user::Column::GroupId.eq(group_id))
+        .filter(entity::auth_group_user::Column::UserId.eq(user_id))
+        .one(db)
+        .await?;
+
+    if current_user.is_none() {
+        return Err(anyhow!("User is not a member of the group"));
+    }
+
     match group.group_type {
         GroupType::Open | GroupType::Auto => {
-            let result = delete_group_members(db, group_id, vec![user_id]).await?;
+            let _ = delete_group_members(db, group_id, vec![user_id]).await?;
 
-            if result.rows_affected == 0 {
-                return Err(anyhow!("User is not a member of the group"));
-            }
-
-            Ok(())
+            Ok(None)
         }
         GroupType::Apply | GroupType::Hidden => {
+            let duplicate_application = entity::prelude::AuthGroupApplication::find()
+                .filter(entity::auth_group_application::Column::GroupId.eq(group_id))
+                .filter(entity::auth_group_application::Column::UserId.eq(user_id))
+                .filter(
+                    entity::auth_group_application::Column::ApplicationStatus
+                        .eq(GroupApplicationStatus::Outstanding),
+                )
+                .filter(
+                    entity::auth_group_application::Column::ApplicationType
+                        .eq(GroupApplicationType::Leave),
+                )
+                .one(db)
+                .await?;
+
+            if duplicate_application.is_some() {
+                return Err(anyhow!("Application to leave already exists"));
+            }
+
             let application = entity::auth_group_application::ActiveModel {
                 group_id: Set(group_id),
                 user_id: Set(user_id),
@@ -512,23 +525,12 @@ pub async fn leave_group(
                 ..Default::default()
             };
 
-            let result = entity::prelude::AuthGroupApplication::insert(application)
-                .on_empty_do_nothing()
-                .on_conflict(
-                    OnConflict::columns(vec![
-                        entity::auth_group_application::Column::GroupId,
-                        entity::auth_group_application::Column::UserId,
-                    ])
-                    .do_nothing()
-                    .to_owned(),
-                )
-                .exec(db)
-                .await?;
+            let application = application.insert(db).await?;
 
-            match result {
-                TryInsertResult::Conflicted => Err(anyhow!("Application to leave already exists")),
-                _ => Ok(()),
-            }
+            let application =
+                get_group_application(db, None, None, Some(application.id), None, None).await?;
+
+            Ok(application.into_iter().next())
         }
     }
 }

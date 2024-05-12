@@ -422,19 +422,6 @@ impl MigrationTrait for Migration {
             .create_index(
                 Index::create()
                     .if_not_exists()
-                    .name("idx-auth_group_application-group_id-user_id")
-                    .table(AuthGroupApplication::Table)
-                    .col(AuthGroupApplication::GroupId)
-                    .col(AuthGroupApplication::UserId)
-                    .unique()
-                    .to_owned(),
-            )
-            .await?;
-
-        manager
-            .create_index(
-                Index::create()
-                    .if_not_exists()
                     .name("idx-auth_group_application-group_id")
                     .table(AuthGroupApplication::Table)
                     .col(AuthGroupApplication::GroupId)
@@ -511,14 +498,6 @@ impl MigrationTrait for Migration {
             .drop_index(
                 sea_query::Index::drop()
                     .name("idx-auth_group_application-group_id")
-                    .to_owned(),
-            )
-            .await?;
-
-        manager
-            .drop_index(
-                sea_query::Index::drop()
-                    .name("idx-auth_group_application-group_id-user_id")
                     .to_owned(),
             )
             .await?;
