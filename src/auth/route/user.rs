@@ -85,11 +85,15 @@ pub async fn get_user(
             }
             None => (StatusCode::NOT_FOUND, "Character info not found.").into_response(),
         },
-        Err(_) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Error getting character info.",
-        )
-            .into_response(),
+        Err(err) => {
+            println!("{}", err);
+
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error getting character info.",
+            )
+                .into_response()
+        }
     }
 }
 
@@ -137,11 +141,15 @@ pub async fn get_user_main_character(
                 (StatusCode::OK, Json(&affiliation[0])).into_response()
             }
         }
-        Err(_) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Error getting user info.",
-        )
-            .into_response(),
+        Err(err) => {
+            println!("{}", err);
+
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error getting user info.",
+            )
+                .into_response()
+        }
     }
 }
 
@@ -196,11 +204,15 @@ pub async fn get_user_characters(
                 (StatusCode::OK, Json(character_affiliations)).into_response()
             }
         }
-        Err(_) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Error getting user info.",
-        )
-            .into_response(),
+        Err(err) => {
+            println!("{}", err);
+
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error getting user info.",
+            )
+                .into_response()
+        }
     }
 }
 
@@ -233,12 +245,14 @@ pub async fn get_user_groups(
                 groups[0].groups.clone()
             }
         }
-        Err(_) => {
+        Err(err) => {
+            println!("{}", err);
+
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Error getting user groups.",
             )
-                .into_response()
+                .into_response();
         }
     };
 
@@ -248,10 +262,14 @@ pub async fn get_user_groups(
 
             (StatusCode::OK, Json(groups)).into_response()
         }
-        Err(_) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Error getting user groups.",
-        )
-            .into_response(),
+        Err(err) => {
+            println!("{}", err);
+
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error getting user groups.",
+            )
+                .into_response()
+        }
     }
 }

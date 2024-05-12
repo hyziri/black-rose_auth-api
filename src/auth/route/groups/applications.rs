@@ -127,6 +127,8 @@ pub async fn update_group_application(
                 return (StatusCode::FORBIDDEN, err.to_string()).into_response();
             }
 
+            println!("{}", err);
+
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Error getting group applications",
@@ -141,6 +143,8 @@ pub async fn update_group_application(
             if err.to_string() == "Application not found" {
                 return (StatusCode::NOT_FOUND, err.to_string()).into_response();
             }
+
+            println!("{}", err);
 
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -188,7 +192,9 @@ pub async fn delete_group_application(
                     .into_response();
             };
         }
-        Err(_) => {
+        Err(err) => {
+            println!("{}", err);
+
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Error getting group applications",
@@ -211,6 +217,8 @@ pub async fn delete_group_application(
             } else if err.to_string() == "Application not found" {
                 return (StatusCode::NOT_FOUND, err.to_string()).into_response();
             }
+
+            println!("{}", err);
 
             (
                 StatusCode::INTERNAL_SERVER_ERROR,

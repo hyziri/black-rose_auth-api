@@ -67,6 +67,8 @@ pub async fn join_group(
                 return (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response();
             }
 
+            println!("{}", err);
+
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Error adding user to group",
@@ -112,6 +114,8 @@ pub async fn leave_group(
                 return (StatusCode::NOT_FOUND, err.to_string()).into_response();
             }
 
+            println!("{}", err);
+
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Error adding user to group",
@@ -146,11 +150,15 @@ pub async fn get_group_members(
 
     match data::groups::get_group_members(&db, group_id.0).await {
         Ok(members) => (StatusCode::OK, Json(members)).into_response(),
-        Err(_) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Error getting group members",
-        )
-            .into_response(),
+        Err(err) => {
+            println!("{}", err);
+
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error getting group members",
+            )
+                .into_response()
+        }
     }
 }
 
@@ -184,6 +192,8 @@ pub async fn add_group_members(
             if err.to_string() == "Group does not exist" {
                 return (StatusCode::NOT_FOUND, "Group does not exist").into_response();
             }
+
+            println!("{}", err);
 
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -222,6 +232,10 @@ pub async fn delete_group_members(
 
     match data::groups::delete_group_members(&db, group_id.0, user_ids.to_vec()).await {
         Ok(_) => (StatusCode::OK, "Users removed successfully").into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error leaving group").into_response(),
+        Err(err) => {
+            println!("{}", err);
+
+            (StatusCode::INTERNAL_SERVER_ERROR, "Error leaving group").into_response()
+        }
     }
 }

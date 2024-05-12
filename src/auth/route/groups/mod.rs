@@ -64,6 +64,8 @@ pub async fn create_group(
         }
         Err(err) => {
             if err.is::<sea_orm::error::DbErr>() {
+                println!("{}", err);
+
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "Error creating new group",
@@ -104,7 +106,10 @@ pub async fn get_groups(
 
             (StatusCode::OK, Json(dto)).into_response()
         }
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error getting groups").into_response(),
+        Err(err) => {
+            println!("{}", err);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Error getting groups").into_response()
+        }
     }
 }
 
@@ -140,7 +145,10 @@ pub async fn get_group_by_id(
             }
             None => (StatusCode::NOT_FOUND, "Group not found").into_response(),
         },
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error getting groups").into_response(),
+        Err(err) => {
+            println!("{}", err);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Error getting groups").into_response()
+        }
     }
 }
 
@@ -172,11 +180,15 @@ pub async fn get_group_filters(
             Some(filters) => (StatusCode::OK, Json(filters)).into_response(),
             None => (StatusCode::NOT_FOUND, "Group filters not found").into_response(),
         },
-        Err(_) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Error getting group filters",
-        )
-            .into_response(),
+        Err(err) => {
+            println!("{}", err);
+
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error getting group filters",
+            )
+                .into_response()
+        }
     }
 }
 
@@ -212,6 +224,8 @@ pub async fn update_group(
         }
         Err(err) => {
             if err.is::<sea_orm::error::DbErr>() {
+                println!("{}", err);
+
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "Error creating new group",
@@ -254,6 +268,7 @@ pub async fn delete_group(
         },
         Err(err) => {
             println!("{}", err);
+
             (StatusCode::INTERNAL_SERVER_ERROR, "Error deleting group").into_response()
         }
     }
