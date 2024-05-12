@@ -415,8 +415,9 @@ pub async fn delete_group(db: &DatabaseConnection, group_id: i32) -> Result<Opti
         ..Default::default()
     };
 
-    let _ = delete_filter_rules(db, group_id).await;
-    let _ = delete_filter_groups(db, group_id).await;
+    let _ = delete_filter_rules(db, group_id).await?;
+    let _ = delete_filter_groups(db, group_id).await?;
+    let _ = delete_all_group_members(db, group_id).await?;
 
     let result = entity::prelude::AuthGroup::delete(group).exec(db).await?;
 
@@ -431,7 +432,7 @@ pub async fn delete_group_members(
     db: &DatabaseConnection,
     group_id: i32,
     user_ids: Vec<i32>,
-) -> Result<u64, DbErr> {
+) -> Result<DeleteResult, DbErr> {
     // validate filters for group type auto
 
     let result = entity::prelude::AuthGroupUser::delete_many()
@@ -440,7 +441,19 @@ pub async fn delete_group_members(
         .exec(db)
         .await?;
 
-    Ok(result.rows_affected)
+    Ok(result)
+}
+
+pub async fn delete_all_group_members(
+    db: &DatabaseConnection,
+    group_id: i32,
+) -> Result<DeleteResult, DbErr> {
+    let result = entity::prelude::AuthGroupUser::delete_many()
+        .filter(entity::auth_group_user::Column::GroupId.eq(group_id))
+        .exec(db)
+        .await?;
+
+    Ok(result)
 }
 
 pub async fn leave_group(
@@ -458,7 +471,7 @@ pub async fn leave_group(
         GroupType::Open | GroupType::Auto => {
             let result = delete_group_members(db, group_id, vec![user_id]).await?;
 
-            if result == 0 {
+            if result.rows_affected == 0 {
                 return Err(anyhow!("User is not a member of the group"));
             }
 

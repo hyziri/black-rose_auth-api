@@ -252,6 +252,9 @@ pub async fn delete_group(
             Some(id) => (StatusCode::OK, format!("Deleted group with id {}", id)).into_response(),
             None => (StatusCode::NOT_FOUND, "Group not found").into_response(),
         },
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error getting groups").into_response(),
+        Err(err) => {
+            println!("{}", err);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Error deleting group").into_response()
+        }
     }
 }
