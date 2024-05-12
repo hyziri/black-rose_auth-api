@@ -1,5 +1,7 @@
 pub mod filters;
 
+use std::collections::HashMap;
+
 use anyhow::anyhow;
 use migration::OnConflict;
 use sea_orm::{
@@ -11,11 +13,11 @@ use crate::{
     auth::{
         data::groups::filters::validate_group_members,
         model::{
-            groups::{NewGroupDto, UpdateGroupDto},
+            groups::{GroupApplicationDto, NewGroupDto, UpdateGroupDto},
             user::UserDto,
         },
     },
-    eve::data::character::bulk_get_characters,
+    eve::data::character::{bulk_get_character_affiliations, bulk_get_characters},
 };
 
 use entity::{
@@ -30,7 +32,7 @@ use self::filters::{
     update_filter_groups, update_filter_rules,
 };
 
-use super::user::bulk_get_user_main_characters;
+use super::user::{bulk_get_user_main_characters, get_user};
 
 pub async fn create_group(
     db: &DatabaseConnection,
@@ -125,6 +127,86 @@ pub async fn get_group_members(
         .collect::<Vec<UserDto>>();
 
     Ok(characters)
+}
+
+pub async fn get_group_applications(
+    db: &DatabaseConnection,
+    application_filter: Option<GroupApplicationType>,
+    group_id: Option<i32>,
+    user_id: Option<i32>,
+) -> Result<Vec<GroupApplicationDto>, anyhow::Error> {
+    if let Some(group_id) = group_id {
+        match get_group_by_id(db, group_id).await? {
+            Some(group) => {
+                if group.group_type == GroupType::Open || group.group_type == GroupType::Auto {
+                    return Err(anyhow!("Group does not require applications"));
+                }
+            }
+            None => return Err(anyhow!("Group does not exist")),
+        };
+    };
+
+    if let Some(user_id) = user_id {
+        match get_user(db, user_id).await? {
+            Some(_) => (),
+            None => return Err(anyhow!("User does not exist")),
+        };
+    };
+
+    let mut query = entity::prelude::AuthGroupApplication::find()
+        .filter(entity::auth_group_application::Column::ApplicationType.eq(application_filter));
+
+    if let Some(group_id) = group_id {
+        query = query.filter(entity::auth_group_application::Column::GroupId.eq(Some(group_id)));
+    }
+
+    if let Some(user_id) = user_id {
+        query = query.filter(entity::auth_group_application::Column::UserId.eq(Some(user_id)));
+    }
+
+    let applications = query.all(db).await?;
+
+    let user_ids = applications
+        .iter()
+        .map(|app| app.user_id)
+        .collect::<Vec<i32>>();
+    let mains = bulk_get_user_main_characters(db, user_ids).await?;
+
+    let character_ids = mains
+        .iter()
+        .map(|main| main.character_id)
+        .collect::<Vec<i32>>();
+    let affiliations = bulk_get_character_affiliations(db, character_ids).await?;
+
+    let mut affiliations_map: HashMap<i32, _> = affiliations
+        .into_iter()
+        .map(|affiliation| (affiliation.character_id, affiliation))
+        .collect();
+    let mut applications_map: HashMap<i32, _> = applications
+        .into_iter()
+        .map(|app| (app.user_id, app))
+        .collect();
+
+    let mut group_applications = vec![];
+
+    for main in mains {
+        if let (Some(character), Some(application)) = (
+            affiliations_map.remove(&main.character_id),
+            applications_map.remove(&main.user_id),
+        ) {
+            let group_application = GroupApplicationDto {
+                id: application.id,
+                group_id: application.group_id,
+                user_id: application.user_id,
+                character_info: character,
+                application_text: application.application_text,
+            };
+
+            group_applications.push(group_application);
+        }
+    }
+
+    Ok(group_applications)
 }
 
 pub async fn update_group(

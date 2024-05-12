@@ -6,7 +6,7 @@ use crate::auth::model::{
     groups::{
         GroupFiltersDto, GroupDto, GroupFilterCriteria, GroupFilterCriteriaType, GroupFilterGroupDto,
         GroupFilterRuleDto, GroupFilterType, GroupType, NewGroupDto, NewGroupFilterGroupDto,
-        NewGroupFilterRuleDto, UpdateGroupDto, UpdateGroupFilterGroupDto, UpdateGroupFilterRuleDto,
+        NewGroupFilterRuleDto, UpdateGroupDto, UpdateGroupFilterGroupDto, UpdateGroupFilterRuleDto, GroupApplicationDto
     },
     user::UserDto,
 };
@@ -23,14 +23,16 @@ pub fn routes() -> Router {
             groups::create_group, groups::get_groups, groups::get_group_by_id,
             groups::get_group_filters, groups::update_group, groups::delete_group,
             groups::join_group, groups::leave_group,
-            groups::get_group_members, groups::add_group_members, groups::delete_group_members
+            groups::get_group_members, groups::add_group_members, groups::delete_group_members,
+            groups::get_group_join_applications
         ),
         components(schemas(
             UserDto, CharacterAffiliationDto, 
             NewGroupDto, NewGroupFilterGroupDto, NewGroupFilterRuleDto,  
             GroupFiltersDto, GroupDto, GroupFilterRuleDto, GroupFilterGroupDto, 
             UpdateGroupDto, UpdateGroupFilterRuleDto, UpdateGroupFilterGroupDto,
-            GroupType, GroupFilterType, GroupFilterCriteria, GroupFilterCriteriaType)),
+            GroupType, GroupFilterType, GroupFilterCriteria, GroupFilterCriteriaType,
+            GroupApplicationDto)),
         tags(
             (name = "Black Rose Auth API", description = "Black Rose Auth API endpoints")
         )

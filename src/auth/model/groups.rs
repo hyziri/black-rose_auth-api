@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::eve::model::character::CharacterAffiliationDto;
+
 // TODO
 // The impl for all the enums could be replaced with a macro as all fields are the exact same
 
@@ -193,6 +195,15 @@ impl From<entity::auth_group_filter_rule::Model> for GroupFilterRuleDto {
             criteria_value: model.criteria_value,
         }
     }
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct GroupApplicationDto {
+    pub id: i32,
+    pub group_id: i32,
+    pub user_id: i32,
+    pub character_info: CharacterAffiliationDto,
+    pub application_text: Option<String>,
 }
 
 #[derive(Deserialize, ToSchema)]

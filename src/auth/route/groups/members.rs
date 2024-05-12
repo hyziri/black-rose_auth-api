@@ -7,10 +7,12 @@ use axum::{
     routing::{delete, get, post},
     Extension, Router,
 };
+use entity::sea_orm_active_enums::GroupApplicationType;
 use sea_orm::DatabaseConnection;
 use tower_sessions::Session;
 
 use crate::auth::data;
+use crate::auth::data::groups::get_group_applications;
 use crate::auth::permissions::require_permissions;
 
 pub fn group_member_routes() -> Router {
@@ -20,6 +22,7 @@ pub fn group_member_routes() -> Router {
         .route("/:id/members", get(get_group_members))
         .route("/:id/members", post(add_group_members))
         .route("/:id/members", delete(delete_group_members))
+        .route("/:id/applications/join", get(get_group_join_applications))
 }
 
 #[utoipa::path(
@@ -144,6 +147,56 @@ pub async fn get_group_members(
             "Error getting group members",
         )
             .into_response(),
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/groups/{id}/applications/join",
+    responses(
+        (status = 200, description = "Outstanding join applications", body = GroupDto),
+        (status = 403, description = "Insufficient permissions", body = String),
+        (status = 404, description = "Not found", body = String),
+        (status = 500, description = "Internal server error", body = String)
+    ),
+    security(
+        ("login" = [])
+    )
+)]
+pub async fn get_group_join_applications(
+    Extension(db): Extension<DatabaseConnection>,
+    session: Session,
+    Path(group_id): Path<(i32,)>,
+) -> Response {
+    match require_permissions(&db, session).await {
+        Ok(_) => (),
+        Err(response) => return response,
+    };
+
+    match get_group_applications(
+        &db,
+        Some(GroupApplicationType::JoinRequest),
+        Some(group_id.0),
+        None,
+    )
+    .await
+    {
+        Ok(applications) => (StatusCode::OK, Json(applications)).into_response(),
+        Err(err) => {
+            if err.to_string() == "Group does not exist" || err.to_string() == "User does not exist"
+            {
+                return (StatusCode::NOT_FOUND, err.to_string()).into_response();
+            }
+            if err.to_string() == "Group does not require applications" {
+                return (StatusCode::FORBIDDEN, err.to_string()).into_response();
+            }
+
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error getting group applications",
+            )
+                .into_response()
+        }
     }
 }
 
