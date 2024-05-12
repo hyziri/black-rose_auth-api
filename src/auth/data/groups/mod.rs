@@ -55,6 +55,7 @@ pub async fn create_group(
         name: Set(new_group.name),
         description: Set(new_group.description),
         confidential: Set(new_group.confidential),
+        leave_applications: Set(new_group.leave_applications),
         group_type: Set(new_group.group_type.into()),
         filter_type: Set(new_group.filter_type.into()),
         ..Default::default()
@@ -254,6 +255,7 @@ pub async fn update_group(
         name: Set(group.name),
         description: Set(group.description),
         confidential: Set(group.confidential),
+        leave_applications: Set(group.leave_applications),
         group_type: Set(group.group_type.into()),
         filter_type: Set(group.filter_type.into()),
     };
@@ -492,46 +494,43 @@ pub async fn leave_group(
         return Err(anyhow!("User is not a member of the group"));
     }
 
-    match group.group_type {
-        GroupType::Open | GroupType::Auto => {
-            let _ = delete_group_members(db, group_id, vec![user_id]).await?;
+    if group.leave_applications {
+        let duplicate_application = entity::prelude::AuthGroupApplication::find()
+            .filter(entity::auth_group_application::Column::GroupId.eq(group_id))
+            .filter(entity::auth_group_application::Column::UserId.eq(user_id))
+            .filter(
+                entity::auth_group_application::Column::ApplicationStatus
+                    .eq(GroupApplicationStatus::Outstanding),
+            )
+            .filter(
+                entity::auth_group_application::Column::ApplicationType
+                    .eq(GroupApplicationType::Leave),
+            )
+            .one(db)
+            .await?;
 
-            Ok(None)
+        if duplicate_application.is_some() {
+            return Err(anyhow!("Application to leave already exists"));
         }
-        GroupType::Apply | GroupType::Hidden => {
-            let duplicate_application = entity::prelude::AuthGroupApplication::find()
-                .filter(entity::auth_group_application::Column::GroupId.eq(group_id))
-                .filter(entity::auth_group_application::Column::UserId.eq(user_id))
-                .filter(
-                    entity::auth_group_application::Column::ApplicationStatus
-                        .eq(GroupApplicationStatus::Outstanding),
-                )
-                .filter(
-                    entity::auth_group_application::Column::ApplicationType
-                        .eq(GroupApplicationType::Leave),
-                )
-                .one(db)
-                .await?;
 
-            if duplicate_application.is_some() {
-                return Err(anyhow!("Application to leave already exists"));
-            }
+        let application = entity::auth_group_application::ActiveModel {
+            group_id: Set(group_id),
+            user_id: Set(user_id),
+            application_type: Set(GroupApplicationType::Leave),
+            application_request_message: Set(application_text),
+            ..Default::default()
+        };
 
-            let application = entity::auth_group_application::ActiveModel {
-                group_id: Set(group_id),
-                user_id: Set(user_id),
-                application_type: Set(GroupApplicationType::Leave),
-                application_request_message: Set(application_text),
-                ..Default::default()
-            };
+        let application = application.insert(db).await?;
 
-            let application = application.insert(db).await?;
+        let application =
+            get_group_application(db, None, None, Some(application.id), None, None).await?;
 
-            let application =
-                get_group_application(db, None, None, Some(application.id), None, None).await?;
+        Ok(application.into_iter().next())
+    } else {
+        let _ = delete_group_members(db, group_id, vec![user_id]).await?;
 
-            Ok(application.into_iter().next())
-        }
+        Ok(None)
     }
 }
 

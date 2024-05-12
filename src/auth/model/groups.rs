@@ -283,6 +283,7 @@ pub struct GroupApplicationDto {
 pub struct NewGroupDto {
     pub name: String,
     pub confidential: bool,
+    pub leave_applications: bool,
     pub description: Option<String>,
     pub group_type: GroupType,
     pub filter_type: GroupFilterType,
@@ -308,6 +309,7 @@ pub struct UpdateGroupDto {
     pub name: String,
     pub description: Option<String>,
     pub confidential: bool,
+    pub leave_applications: bool,
     pub group_type: GroupType,
     pub filter_type: GroupFilterType,
     pub filter_rules: Vec<UpdateGroupFilterRuleDto>,
@@ -332,6 +334,7 @@ impl From<UpdateGroupDto> for NewGroupDto {
             name: model.name,
             description: model.description,
             confidential: model.confidential,
+            leave_applications: model.leave_applications,
             group_type: model.group_type,
             filter_type: model.filter_type,
             filter_groups: new_groups,

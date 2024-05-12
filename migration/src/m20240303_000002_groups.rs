@@ -54,6 +54,12 @@ impl MigrationTrait for Migration {
                             .default(false),
                     )
                     .col(
+                        ColumnDef::new(AuthGroup::LeaveApplications)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .col(
                         ColumnDef::new(AuthGroup::GroupType)
                             .enumeration(
                                 Alias::new("group_type"),
@@ -669,9 +675,10 @@ enum AuthGroup {
     Id,
     Name,
     Description,
-    Confidential, // Whether or not members are hidden
-    GroupType,    // Open, Auto, Apply, Hidden
-    FilterType,   // All, Any
+    Confidential,      // Whether or not members are hidden
+    LeaveApplications, // Require applications to leave if true
+    GroupType,         // Open, Auto, Apply, Hidden
+    FilterType,        // All, Any
 }
 
 #[derive(DeriveIden)]

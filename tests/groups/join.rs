@@ -25,6 +25,7 @@ async fn group_type_open() -> Result<(), anyhow::Error> {
             name: "No Requirements All".to_string(),
             description: Some("No requirements group with all filter".to_string()),
             confidential: false,
+            leave_applications: false,
             group_type: GroupType::Open,
             filter_type: GroupFilterType::All,
             filter_rules: vec![],
@@ -34,6 +35,7 @@ async fn group_type_open() -> Result<(), anyhow::Error> {
             name: "No Requirements Any".to_string(),
             description: Some("No requirements group with any filter".to_string()),
             confidential: false,
+            leave_applications: false,
             group_type: GroupType::Open,
             filter_type: GroupFilterType::Any,
             filter_rules: vec![],
@@ -82,6 +84,7 @@ async fn filter_type_any() -> Result<(), anyhow::Error> {
         name: "Nocturne or Black Rose Group".to_string(),
         description: Some("Must be in either Black Rose. or Nocturne. to join.".to_string()),
         confidential: false,
+        leave_applications: false,
         group_type: GroupType::Open,
         filter_type: GroupFilterType::Any,
         filter_rules: vec![
@@ -143,6 +146,7 @@ async fn filter_type_all() -> Result<(), anyhow::Error> {
                 .to_string(),
         ),
         confidential: false,
+        leave_applications: false,
         group_type: GroupType::Open,
         filter_type: GroupFilterType::All,
         filter_rules: vec![
@@ -235,6 +239,7 @@ async fn group_filter() -> Result<(), anyhow::Error> {
         name: "No Requirements".to_string(),
         description: Some("No requirements group".to_string()),
         confidential: false,
+        leave_applications: false,
         group_type: GroupType::Open,
         filter_type: GroupFilterType::Any,
         filter_rules: vec![],
@@ -248,6 +253,7 @@ async fn group_filter() -> Result<(), anyhow::Error> {
         name: "No Requirements".to_string(),
         description: Some("No requirements group".to_string()),
         confidential: false,
+        leave_applications: false,
         group_type: GroupType::Open,
         filter_type: GroupFilterType::Any,
         filter_rules: vec![NewGroupFilterRuleDto {
@@ -281,6 +287,7 @@ async fn corp_filter() -> Result<(), anyhow::Error> {
         name: "Corporation Group".to_string(),
         description: Some("Must be in required corporation to join".to_string()),
         confidential: false,
+        leave_applications: false,
         group_type: GroupType::Open,
         filter_type: GroupFilterType::All,
         filter_rules: vec![NewGroupFilterRuleDto {
@@ -300,6 +307,7 @@ async fn alliance_filter() -> Result<(), anyhow::Error> {
         name: "Corporation CEO Group".to_string(),
         description: Some("Must be in required alliance to join".to_string()),
         confidential: false,
+        leave_applications: false,
         group_type: GroupType::Open,
         filter_type: GroupFilterType::All,
         filter_rules: vec![NewGroupFilterRuleDto {
@@ -319,6 +327,7 @@ async fn ceo_filter() -> Result<(), anyhow::Error> {
         name: "Corporation CEO Group".to_string(),
         description: Some("Must be a corporation CEO to join".to_string()),
         confidential: false,
+        leave_applications: false,
         group_type: GroupType::Open,
         filter_type: GroupFilterType::All,
         filter_rules: vec![NewGroupFilterRuleDto {
@@ -348,6 +357,7 @@ async fn executor_filter() -> Result<(), anyhow::Error> {
         name: "Alliance Executor Group".to_string(),
         description: Some("Must be an alliance executor to join".to_string()),
         confidential: false,
+        leave_applications: false,
         group_type: GroupType::Open,
         filter_type: GroupFilterType::Any,
         filter_rules: vec![NewGroupFilterRuleDto {
