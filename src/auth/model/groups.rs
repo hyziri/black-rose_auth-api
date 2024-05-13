@@ -212,6 +212,37 @@ impl From<entity::sea_orm_active_enums::GroupApplicationStatus> for GroupApplica
     }
 }
 
+#[derive(Serialize, Deserialize, ToSchema, Clone, PartialEq)]
+pub enum GroupOwnerType {
+    Auth,
+    Corporation,
+    Alliance,
+}
+
+impl From<GroupOwnerType> for entity::sea_orm_active_enums::GroupOwnerType {
+    fn from(item: GroupOwnerType) -> Self {
+        match item {
+            GroupOwnerType::Auth => entity::sea_orm_active_enums::GroupOwnerType::Auth,
+            GroupOwnerType::Corporation => {
+                entity::sea_orm_active_enums::GroupOwnerType::Corporation
+            }
+            GroupOwnerType::Alliance => entity::sea_orm_active_enums::GroupOwnerType::Alliance,
+        }
+    }
+}
+
+impl From<entity::sea_orm_active_enums::GroupOwnerType> for GroupOwnerType {
+    fn from(item: entity::sea_orm_active_enums::GroupOwnerType) -> Self {
+        match item {
+            entity::sea_orm_active_enums::GroupOwnerType::Auth => GroupOwnerType::Auth,
+            entity::sea_orm_active_enums::GroupOwnerType::Corporation => {
+                GroupOwnerType::Corporation
+            }
+            entity::sea_orm_active_enums::GroupOwnerType::Alliance => GroupOwnerType::Alliance,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct GroupDto {
     pub id: i32,
@@ -283,9 +314,11 @@ pub struct GroupApplicationDto {
 #[derive(Deserialize, ToSchema)]
 pub struct NewGroupDto {
     pub name: String,
+    pub description: Option<String>,
     pub confidential: bool,
     pub leave_applications: bool,
-    pub description: Option<String>,
+    pub owner_type: GroupOwnerType,
+    pub owner_id: Option<i32>,
     pub group_type: GroupType,
     pub filter_type: GroupFilterType,
     pub filter_rules: Vec<NewGroupFilterRuleDto>,
@@ -311,6 +344,8 @@ pub struct UpdateGroupDto {
     pub description: Option<String>,
     pub confidential: bool,
     pub leave_applications: bool,
+    pub owner_type: GroupOwnerType,
+    pub owner_id: Option<i32>,
     pub group_type: GroupType,
     pub filter_type: GroupFilterType,
     pub filter_rules: Vec<UpdateGroupFilterRuleDto>,
@@ -336,6 +371,8 @@ impl From<UpdateGroupDto> for NewGroupDto {
             description: model.description,
             confidential: model.confidential,
             leave_applications: model.leave_applications,
+            owner_type: model.owner_type,
+            owner_id: model.owner_id,
             group_type: model.group_type,
             filter_type: model.filter_type,
             filter_groups: new_groups,

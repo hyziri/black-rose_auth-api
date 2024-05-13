@@ -29,7 +29,7 @@ pub fn group_application_routes() -> Router {
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
-pub struct GetGroupParms {
+pub struct GetGroupApplicationParams {
     pub group_id: Option<i32>,
     pub user_id: Option<i32>,
     pub application_status: Option<GroupApplicationStatus>,
@@ -58,7 +58,7 @@ pub struct GetGroupParms {
 pub async fn get_group_applications(
     Extension(db): Extension<DatabaseConnection>,
     session: Session,
-    Query(params): Query<GetGroupParms>,
+    Query(params): Query<GetGroupApplicationParams>,
 ) -> Response {
     match require_permissions(&db, session).await {
         Ok(_) => (),

@@ -34,6 +34,19 @@ impl MigrationTrait for Migration {
             .await?;
 
         manager
+            .create_type(
+                Type::create()
+                    .as_enum(Alias::new("group_owner_type"))
+                    .values([
+                        Alias::new("Auth"),
+                        Alias::new("Alliance"),
+                        Alias::new("Corporation"),
+                    ])
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
             .create_table(
                 Table::create()
                     .table(AuthGroup::Table)
@@ -59,6 +72,19 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(false),
                     )
+                    .col(
+                        ColumnDef::new(AuthGroup::OwnerType)
+                            .enumeration(
+                                Alias::new("group_owner_type"),
+                                [
+                                    Alias::new("Auth"),
+                                    Alias::new("Alliance"),
+                                    Alias::new("Corporation"),
+                                ],
+                            )
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(AuthGroup::OwnerId).integer())
                     .col(
                         ColumnDef::new(AuthGroup::GroupType)
                             .enumeration(
@@ -676,6 +702,10 @@ impl MigrationTrait for Migration {
             .await?;
 
         manager
+            .drop_type(Type::drop().name(Alias::new("group_owner_type")).to_owned())
+            .await?;
+
+        manager
             .drop_type(
                 Type::drop()
                     .name(Alias::new("group_filter_type"))
@@ -696,6 +726,8 @@ enum AuthGroup {
     Table,
     Id,
     Name,
+    OwnerType, // Alliance, Corporation
+    OwnerId,   // i32, i32
     Description,
     Confidential,      // Whether or not members are hidden
     LeaveApplications, // Require applications to leave if true

@@ -4,10 +4,10 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::auth::{model::{
     groups::{
-        GroupApplicationDto, GroupApplicationStatus, GroupApplicationType, GroupDto, GroupFilterCriteria, GroupFilterCriteriaType, GroupFilterGroupDto, GroupFilterRuleDto, GroupFilterType, GroupFiltersDto, GroupType, NewGroupDto, NewGroupFilterGroupDto, NewGroupFilterRuleDto, UpdateGroupDto, UpdateGroupFilterGroupDto, UpdateGroupFilterRuleDto
+        GroupApplicationDto, GroupApplicationStatus, GroupApplicationType, GroupDto, GroupFilterCriteria, GroupFilterCriteriaType, GroupFilterGroupDto, GroupFilterRuleDto, GroupFilterType, GroupFiltersDto, GroupOwnerType, GroupType, NewGroupDto, NewGroupFilterGroupDto, NewGroupFilterRuleDto, UpdateGroupDto, UpdateGroupFilterGroupDto, UpdateGroupFilterRuleDto
     },
     user::UserDto,
-}, route::groups::applications::{ApplicationAction, GetGroupParms}};
+}, route::groups::applications::{ApplicationAction, GetGroupApplicationParams}};
 use crate::auth::route::{auth, groups, user};
 use crate::eve::model::character::CharacterAffiliationDto;
 
@@ -31,7 +31,8 @@ pub fn routes() -> Router {
             GroupFiltersDto, GroupDto, GroupFilterRuleDto, GroupFilterGroupDto, 
             UpdateGroupDto, UpdateGroupFilterRuleDto, UpdateGroupFilterGroupDto,
             GroupType, GroupFilterType, GroupFilterCriteria, GroupFilterCriteriaType,
-            GroupApplicationDto, GroupApplicationStatus, GroupApplicationType, ApplicationAction,GetGroupParms)),
+            GroupApplicationDto, GroupApplicationStatus, GroupApplicationType, ApplicationAction,
+            GetGroupApplicationParams, GroupOwnerType)),
         tags(
             (name = "Black Rose Auth API", description = "Black Rose Auth API endpoints")
         )

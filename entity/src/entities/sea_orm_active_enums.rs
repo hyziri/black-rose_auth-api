@@ -70,6 +70,16 @@ pub enum GroupFilterType {
     Any,
 }
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
+#[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "group_owner_type")]
+pub enum GroupOwnerType {
+    #[sea_orm(string_value = "Alliance")]
+    Alliance,
+    #[sea_orm(string_value = "Auth")]
+    Auth,
+    #[sea_orm(string_value = "Corporation")]
+    Corporation,
+}
+#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
 #[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "group_type")]
 pub enum GroupType {
     #[sea_orm(string_value = "Apply")]

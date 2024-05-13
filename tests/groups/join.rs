@@ -2,8 +2,8 @@ use crate::common::{create_tables, create_user};
 use black_rose_auth_api::auth::{
     data::groups::{add_group_members, create_group},
     model::groups::{
-        GroupFilterCriteria, GroupFilterCriteriaType, GroupFilterType, GroupType, NewGroupDto,
-        NewGroupFilterRuleDto,
+        GroupFilterCriteria, GroupFilterCriteriaType, GroupFilterType, GroupOwnerType, GroupType,
+        NewGroupDto, NewGroupFilterRuleDto,
     },
 };
 use sea_orm::{Database, TryInsertResult};
@@ -26,6 +26,8 @@ async fn group_type_open() -> Result<(), anyhow::Error> {
             description: Some("No requirements group with all filter".to_string()),
             confidential: false,
             leave_applications: false,
+            owner_type: GroupOwnerType::Auth,
+            owner_id: None,
             group_type: GroupType::Open,
             filter_type: GroupFilterType::All,
             filter_rules: vec![],
@@ -36,6 +38,8 @@ async fn group_type_open() -> Result<(), anyhow::Error> {
             description: Some("No requirements group with any filter".to_string()),
             confidential: false,
             leave_applications: false,
+            owner_type: GroupOwnerType::Auth,
+            owner_id: None,
             group_type: GroupType::Open,
             filter_type: GroupFilterType::Any,
             filter_rules: vec![],
@@ -85,6 +89,8 @@ async fn filter_type_any() -> Result<(), anyhow::Error> {
         description: Some("Must be in either Black Rose. or Nocturne. to join.".to_string()),
         confidential: false,
         leave_applications: false,
+        owner_type: GroupOwnerType::Auth,
+        owner_id: None,
         group_type: GroupType::Open,
         filter_type: GroupFilterType::Any,
         filter_rules: vec![
@@ -147,6 +153,8 @@ async fn filter_type_all() -> Result<(), anyhow::Error> {
         ),
         confidential: false,
         leave_applications: false,
+        owner_type: GroupOwnerType::Auth,
+        owner_id: None,
         group_type: GroupType::Open,
         filter_type: GroupFilterType::All,
         filter_rules: vec![
@@ -240,6 +248,8 @@ async fn group_filter() -> Result<(), anyhow::Error> {
         description: Some("No requirements group".to_string()),
         confidential: false,
         leave_applications: false,
+        owner_type: GroupOwnerType::Auth,
+        owner_id: None,
         group_type: GroupType::Open,
         filter_type: GroupFilterType::Any,
         filter_rules: vec![],
@@ -254,6 +264,8 @@ async fn group_filter() -> Result<(), anyhow::Error> {
         description: Some("No requirements group".to_string()),
         confidential: false,
         leave_applications: false,
+        owner_type: GroupOwnerType::Auth,
+        owner_id: None,
         group_type: GroupType::Open,
         filter_type: GroupFilterType::Any,
         filter_rules: vec![NewGroupFilterRuleDto {
@@ -288,6 +300,8 @@ async fn corp_filter() -> Result<(), anyhow::Error> {
         description: Some("Must be in required corporation to join".to_string()),
         confidential: false,
         leave_applications: false,
+        owner_type: GroupOwnerType::Auth,
+        owner_id: None,
         group_type: GroupType::Open,
         filter_type: GroupFilterType::All,
         filter_rules: vec![NewGroupFilterRuleDto {
@@ -308,6 +322,8 @@ async fn alliance_filter() -> Result<(), anyhow::Error> {
         description: Some("Must be in required alliance to join".to_string()),
         confidential: false,
         leave_applications: false,
+        owner_type: GroupOwnerType::Auth,
+        owner_id: None,
         group_type: GroupType::Open,
         filter_type: GroupFilterType::All,
         filter_rules: vec![NewGroupFilterRuleDto {
@@ -328,6 +344,8 @@ async fn ceo_filter() -> Result<(), anyhow::Error> {
         description: Some("Must be a corporation CEO to join".to_string()),
         confidential: false,
         leave_applications: false,
+        owner_type: GroupOwnerType::Auth,
+        owner_id: None,
         group_type: GroupType::Open,
         filter_type: GroupFilterType::All,
         filter_rules: vec![NewGroupFilterRuleDto {
@@ -358,6 +376,8 @@ async fn executor_filter() -> Result<(), anyhow::Error> {
         description: Some("Must be an alliance executor to join".to_string()),
         confidential: false,
         leave_applications: false,
+        owner_type: GroupOwnerType::Auth,
+        owner_id: None,
         group_type: GroupType::Open,
         filter_type: GroupFilterType::Any,
         filter_rules: vec![NewGroupFilterRuleDto {
