@@ -1,9 +1,7 @@
 use std::collections::HashSet;
 
 use entity::prelude::EveCorporation;
-use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
-};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 
 use entity::eve_corporation::Model as Corporation;
 
@@ -29,10 +27,11 @@ pub async fn create_corporation(
             let corporation = eve_esi::corporation::get_corporation(corporation_id).await?;
 
             let new_corporation = entity::eve_corporation::ActiveModel {
-                corporation_id: ActiveValue::Set(corporation_id),
-                corporation_name: ActiveValue::Set(corporation.name),
-                alliance_id: ActiveValue::Set(corporation.alliance_id),
-                ceo: ActiveValue::set(corporation.ceo_id),
+                corporation_id: Set(corporation_id),
+                corporation_name: Set(corporation.name),
+                alliance_id: Set(corporation.alliance_id),
+                ceo: Set(corporation.ceo_id),
+                last_updated: Set(chrono::Utc::now().naive_utc()),
                 ..Default::default()
             };
 

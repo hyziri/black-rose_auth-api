@@ -1,13 +1,20 @@
+use chrono::Utc;
 use sea_orm::DbErr;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
 };
+use std::collections::HashMap;
 
 use entity::auth_user::Model as User;
 use entity::auth_user_character_ownership::Model as UserCharacterOwnership;
 
+use crate::auth::model::user::{UserAffiliations, UserGroups};
+use crate::eve::data::character::bulk_get_character_affiliations;
+
 pub async fn create_user(db: &DatabaseConnection) -> Result<i32, DbErr> {
     let user = entity::auth_user::ActiveModel {
+        admin: Set(false),
+        created: Set(Utc::now().naive_utc()),
         ..Default::default()
     };
 
@@ -123,6 +130,16 @@ pub async fn get_user_character_ownerships(
         .await
 }
 
+pub async fn bulk_get_character_ownerships(
+    db: &DatabaseConnection,
+    user_ids: Vec<i32>,
+) -> Result<Vec<UserCharacterOwnership>, DbErr> {
+    entity::prelude::AuthUserCharacterOwnership::find()
+        .filter(entity::auth_user_character_ownership::Column::UserId.is_in(user_ids))
+        .all(db)
+        .await
+}
+
 pub async fn get_user_character_ownership_by_ownerhash(
     db: &DatabaseConnection,
     ownerhash: String,
@@ -130,6 +147,88 @@ pub async fn get_user_character_ownership_by_ownerhash(
     entity::prelude::AuthUserCharacterOwnership::find()
         .filter(entity::auth_user_character_ownership::Column::Ownerhash.eq(ownerhash))
         .one(db)
+        .await
+}
+
+pub async fn bulk_get_user_affiliations(
+    db: &DatabaseConnection,
+    user_ids: Vec<i32>,
+) -> Result<Vec<UserAffiliations>, DbErr> {
+    let ownerships = bulk_get_character_ownerships(db, user_ids).await?;
+    let character_ids: Vec<i32> = ownerships.iter().map(|char| char.character_id).collect();
+    let affiliations = bulk_get_character_affiliations(db, character_ids.clone()).await?;
+
+    let mut user_affiliations: HashMap<i32, UserAffiliations> = HashMap::new();
+    let ownerships_map: HashMap<i32, &entity::auth_user_character_ownership::Model> = ownerships
+        .iter()
+        .map(|ownership| (ownership.character_id, ownership))
+        .collect();
+
+    for ownership in &ownerships {
+        user_affiliations
+            .entry(ownership.user_id)
+            .or_insert(UserAffiliations {
+                user_id: ownership.user_id,
+                characters: Vec::new(),
+                corporations: Vec::new(),
+                alliances: Vec::new(),
+            });
+    }
+
+    for affiliation in &affiliations {
+        if let Some(ownership) = ownerships_map.get(&affiliation.character_id) {
+            if let Some(user_affiliation) = user_affiliations.get_mut(&ownership.user_id) {
+                user_affiliation.characters.push(affiliation.character_id);
+                user_affiliation
+                    .corporations
+                    .push(affiliation.corporation_id);
+                if let Some(alliance_id) = affiliation.alliance_id {
+                    user_affiliation.alliances.push(alliance_id);
+                }
+            }
+        }
+    }
+
+    let user_affiliations = user_affiliations.into_values().collect();
+
+    Ok(user_affiliations)
+}
+
+pub async fn bulk_get_user_groups(
+    db: &DatabaseConnection,
+    user_ids: Vec<i32>,
+) -> Result<Vec<UserGroups>, DbErr> {
+    let user_groups: Vec<entity::auth_group_user::Model> = entity::prelude::AuthGroupUser::find()
+        .filter(entity::auth_group_user::Column::UserId.is_in(user_ids))
+        .all(db)
+        .await?;
+
+    let mut user_groups_map: HashMap<i32, UserGroups> = HashMap::new();
+
+    for user_group in user_groups {
+        user_groups_map
+            .entry(user_group.user_id)
+            .or_insert_with(|| UserGroups {
+                user_id: user_group.user_id,
+                groups: Vec::new(),
+            })
+            .groups
+            .push(user_group.group_id);
+    }
+
+    let user_groups: Vec<UserGroups> = user_groups_map.into_values().collect();
+
+    Ok(user_groups)
+}
+
+pub async fn bulk_get_user_main_characters(
+    db: &DatabaseConnection,
+    user_ids: Vec<i32>,
+) -> Result<Vec<UserCharacterOwnership>, DbErr> {
+    entity::prelude::AuthUserCharacterOwnership::find()
+        .filter(entity::auth_user_character_ownership::Column::UserId.is_in(user_ids))
+        .filter(entity::auth_user_character_ownership::Column::Main.eq(true))
+        .all(db)
         .await
 }
 

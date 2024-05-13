@@ -1,7 +1,7 @@
 version: '3.6'
 services:
   valkey:
-    image: valkey/valkey:unstable
+    image: valkey/valkey:latest
     ports:
       - "6379:6379"
       

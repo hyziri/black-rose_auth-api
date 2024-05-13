@@ -8,7 +8,13 @@ use std::collections::HashSet;
 use tower_sessions::Session;
 
 use crate::{
-    auth::{data::user::get_user_character_ownerships, model::user::UserDto},
+    auth::{
+        data::{
+            groups::bulk_get_groups_by_id,
+            user::{bulk_get_user_groups, get_user_character_ownerships},
+        },
+        model::{groups::GroupDto, user::UserDto},
+    },
     eve::data::character::{bulk_get_character_affiliations, get_character},
 };
 
@@ -17,6 +23,7 @@ pub fn user_routes() -> Router {
         .route("/", get(get_user))
         .route("/main", get(get_user_main_character))
         .route("/characters", get(get_user_characters))
+        .route("/groups", get(get_user_groups))
 }
 
 async fn get_user_id_from_session(session: Session) -> Result<i32, Response> {
@@ -78,11 +85,15 @@ pub async fn get_user(
             }
             None => (StatusCode::NOT_FOUND, "Character info not found.").into_response(),
         },
-        Err(_) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Error getting character info.",
-        )
-            .into_response(),
+        Err(err) => {
+            println!("{}", err);
+
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error getting character info.",
+            )
+                .into_response()
+        }
     }
 }
 
@@ -130,11 +141,15 @@ pub async fn get_user_main_character(
                 (StatusCode::OK, Json(&affiliation[0])).into_response()
             }
         }
-        Err(_) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Error getting user info.",
-        )
-            .into_response(),
+        Err(err) => {
+            println!("{}", err);
+
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error getting user info.",
+            )
+                .into_response()
+        }
     }
 }
 
@@ -189,10 +204,72 @@ pub async fn get_user_characters(
                 (StatusCode::OK, Json(character_affiliations)).into_response()
             }
         }
-        Err(_) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Error getting user info.",
-        )
-            .into_response(),
+        Err(err) => {
+            println!("{}", err);
+
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error getting user info.",
+            )
+                .into_response()
+        }
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/user/groups",
+    responses(
+        (status = 200, description = "Returns list of user groups", body = Vec<GroupDto>),
+        (status = 404, description = "User not found", body = String),
+        (status = 500, description = "Internal server error", body = String)
+    ),
+    security(
+        ("login" = [])
+    )
+)]
+pub async fn get_user_groups(
+    Extension(db): Extension<sea_orm::DatabaseConnection>,
+    session: Session,
+) -> Response {
+    let user_id = match get_user_id_from_session(session).await {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+
+    let group_ids = match bulk_get_user_groups(&db, vec![user_id]).await {
+        Ok(groups) => {
+            if groups.is_empty() {
+                return (StatusCode::NOT_FOUND, "No groups found for user").into_response();
+            } else {
+                groups[0].groups.clone()
+            }
+        }
+        Err(err) => {
+            println!("{}", err);
+
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error getting user groups.",
+            )
+                .into_response();
+        }
+    };
+
+    match bulk_get_groups_by_id(&db, group_ids).await {
+        Ok(groups) => {
+            let groups: Vec<GroupDto> = groups.into_iter().map(GroupDto::from).collect();
+
+            (StatusCode::OK, Json(groups)).into_response()
+        }
+        Err(err) => {
+            println!("{}", err);
+
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error getting user groups.",
+            )
+                .into_response()
+        }
     }
 }

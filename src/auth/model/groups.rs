@@ -1,5 +1,8 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+use crate::eve::model::character::CharacterAffiliationDto;
 
 // TODO
 // The impl for all the enums could be replaced with a macro as all fields are the exact same
@@ -34,7 +37,7 @@ impl From<entity::sea_orm_active_enums::GroupType> for GroupType {
     }
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Clone)]
+#[derive(Serialize, Deserialize, ToSchema, Clone, PartialEq)]
 pub enum GroupFilterType {
     All,
     Any,
@@ -96,7 +99,7 @@ impl From<entity::sea_orm_active_enums::GroupFilterCriteria> for GroupFilterCrit
     }
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Clone)]
+#[derive(Serialize, Deserialize, ToSchema, Clone, PartialEq)]
 pub enum GroupFilterCriteriaType {
     Is,
     IsNot,
@@ -142,6 +145,73 @@ impl From<entity::sea_orm_active_enums::GroupFilterCriteriaType> for GroupFilter
     }
 }
 
+#[derive(Serialize, Deserialize, ToSchema, Clone, PartialEq)]
+pub enum GroupApplicationType {
+    Join,
+    Leave,
+}
+
+impl From<GroupApplicationType> for entity::sea_orm_active_enums::GroupApplicationType {
+    fn from(item: GroupApplicationType) -> Self {
+        match item {
+            GroupApplicationType::Join => entity::sea_orm_active_enums::GroupApplicationType::Join,
+            GroupApplicationType::Leave => {
+                entity::sea_orm_active_enums::GroupApplicationType::Leave
+            }
+        }
+    }
+}
+
+impl From<entity::sea_orm_active_enums::GroupApplicationType> for GroupApplicationType {
+    fn from(item: entity::sea_orm_active_enums::GroupApplicationType) -> Self {
+        match item {
+            entity::sea_orm_active_enums::GroupApplicationType::Join => GroupApplicationType::Join,
+            entity::sea_orm_active_enums::GroupApplicationType::Leave => {
+                GroupApplicationType::Leave
+            }
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Clone, PartialEq)]
+pub enum GroupApplicationStatus {
+    Outstanding,
+    Accepted,
+    Rejected,
+}
+
+impl From<GroupApplicationStatus> for entity::sea_orm_active_enums::GroupApplicationStatus {
+    fn from(item: GroupApplicationStatus) -> Self {
+        match item {
+            GroupApplicationStatus::Outstanding => {
+                entity::sea_orm_active_enums::GroupApplicationStatus::Outstanding
+            }
+            GroupApplicationStatus::Accepted => {
+                entity::sea_orm_active_enums::GroupApplicationStatus::Accepted
+            }
+            GroupApplicationStatus::Rejected => {
+                entity::sea_orm_active_enums::GroupApplicationStatus::Rejected
+            }
+        }
+    }
+}
+
+impl From<entity::sea_orm_active_enums::GroupApplicationStatus> for GroupApplicationStatus {
+    fn from(item: entity::sea_orm_active_enums::GroupApplicationStatus) -> Self {
+        match item {
+            entity::sea_orm_active_enums::GroupApplicationStatus::Outstanding => {
+                GroupApplicationStatus::Outstanding
+            }
+            entity::sea_orm_active_enums::GroupApplicationStatus::Accepted => {
+                GroupApplicationStatus::Accepted
+            }
+            entity::sea_orm_active_enums::GroupApplicationStatus::Rejected => {
+                GroupApplicationStatus::Rejected
+            }
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct GroupDto {
     pub id: i32,
@@ -162,7 +232,7 @@ impl From<entity::auth_group::Model> for GroupDto {
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
-pub struct GroupFilters {
+pub struct GroupFiltersDto {
     pub id: i32,
     pub filter_type: GroupFilterType,
     pub filter_rules: Vec<GroupFilterRuleDto>,
@@ -195,10 +265,26 @@ impl From<entity::auth_group_filter_rule::Model> for GroupFilterRuleDto {
     }
 }
 
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct GroupApplicationDto {
+    pub id: i32,
+    pub group_id: i32,
+    pub user_id: i32,
+    pub applicant_info: CharacterAffiliationDto,
+    pub responder_info: Option<CharacterAffiliationDto>,
+    pub request_type: GroupApplicationType,
+    pub status: GroupApplicationStatus,
+    pub request_message: Option<String>,
+    pub response_message: Option<String>,
+    pub created: DateTime<Utc>,
+    pub last_updated: DateTime<Utc>,
+}
+
 #[derive(Deserialize, ToSchema)]
 pub struct NewGroupDto {
     pub name: String,
     pub confidential: bool,
+    pub leave_applications: bool,
     pub description: Option<String>,
     pub group_type: GroupType,
     pub filter_type: GroupFilterType,
@@ -224,6 +310,7 @@ pub struct UpdateGroupDto {
     pub name: String,
     pub description: Option<String>,
     pub confidential: bool,
+    pub leave_applications: bool,
     pub group_type: GroupType,
     pub filter_type: GroupFilterType,
     pub filter_rules: Vec<UpdateGroupFilterRuleDto>,
@@ -248,6 +335,7 @@ impl From<UpdateGroupDto> for NewGroupDto {
             name: model.name,
             description: model.description,
             confidential: model.confidential,
+            leave_applications: model.leave_applications,
             group_type: model.group_type,
             filter_type: model.filter_type,
             filter_groups: new_groups,

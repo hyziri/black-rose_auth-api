@@ -170,7 +170,9 @@ pub async fn callback(
 
     let ownership_entry = match get_or_create_user(&db, params.0.code.clone(), user).await {
         Ok(entry) => entry,
-        Err(_) => {
+        Err(err) => {
+            println!("{}", err);
+
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "There was an issue logging you in, please try again.",
@@ -196,7 +198,9 @@ pub async fn callback(
                         .into_response();
                 }
             },
-            Err(_) => {
+            Err(err) => {
+                println!("{}", err);
+
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "There was an issue logging you in, please try again.",
