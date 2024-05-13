@@ -30,7 +30,7 @@ pub fn group_routes() -> Router {
         .route("/:group_id", delete(delete_group))
         .route("/:group_id/filters", get(get_group_filters))
         .nest("", group_member_routes())
-        .nest("", group_application_routes())
+        .nest("/applications", group_application_routes())
 }
 
 #[utoipa::path(

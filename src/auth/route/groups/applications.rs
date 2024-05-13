@@ -1,4 +1,4 @@
-use axum::extract::Path;
+use axum::extract::{Path, Query};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
@@ -19,32 +19,37 @@ use crate::auth::permissions::require_permissions;
 
 pub fn group_application_routes() -> Router {
     Router::new()
+        .route("/", get(get_group_applications))
+        .route("/:application_id", put(update_group_application))
+        .route("/:application_id", delete(delete_group_application))
         .route(
-            "/:group_id/applications/:application_status/:application_type",
-            get(get_group_applications),
-        )
-        .route(
-            "/application/:application_id",
-            put(update_group_application),
-        )
-        .route(
-            "/application/:application_id",
-            delete(delete_group_application),
-        )
-        .route(
-            "/application/:application_id/:application_action",
+            "/:application_id/:application_action",
             post(accept_reject_application),
         )
 }
 
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct GetGroupParms {
+    pub group_id: Option<i32>,
+    pub user_id: Option<i32>,
+    pub application_status: Option<GroupApplicationStatus>,
+    pub application_type: Option<GroupApplicationType>,
+}
+
 #[utoipa::path(
     get,
-    path = "/groups/{group_id}/applications/{application_status}/{application_type}",
+    path = "/groups/applications",
     responses(
-        (status = 200, description = "Outstanding join applications", body = GroupDto),
+        (status = 200, description = "Applications", body = GroupDto),
         (status = 403, description = "Insufficient permissions", body = String),
         (status = 404, description = "Not found", body = String),
         (status = 500, description = "Internal server error", body = String)
+    ),
+    params (
+        ("group_id" = Option<i32>, Query, description = "Filter by group id"),
+        ("user_id" = Option<i32>, Query, description = "Filter user by id"),
+        ("application_status" = Option<GroupApplicationStatus>, Query, description = "Filter by application status"),
+        ("application_type" = Option<GroupApplicationType>, Query, description = "Filter by application type"),
     ),
     security(
         ("login" = [])
@@ -53,7 +58,7 @@ pub fn group_application_routes() -> Router {
 pub async fn get_group_applications(
     Extension(db): Extension<DatabaseConnection>,
     session: Session,
-    Path(path): Path<(i32, GroupApplicationStatus, GroupApplicationType)>,
+    Query(params): Query<GetGroupParms>,
 ) -> Response {
     match require_permissions(&db, session).await {
         Ok(_) => (),
@@ -62,11 +67,11 @@ pub async fn get_group_applications(
 
     match data::groups::get_group_application(
         &db,
-        Some(path.1.into()),
-        Some(path.2.into()),
+        params.application_status.map(|status| status.into()),
+        params.application_type.map(|type_| type_.into()),
         None,
-        Some(path.0),
-        None,
+        params.group_id,
+        params.user_id,
     )
     .await
     {
@@ -93,7 +98,7 @@ pub async fn get_group_applications(
 
 #[utoipa::path(
     put,
-    path = "/groups/application/{application_id}",
+    path = "/groups/applications/{application_id}",
     responses(
         (status = 200, description = "Successfully updated application", body = GroupDto),
         (status = 403, description = "Insufficient permissions", body = String),
@@ -175,7 +180,7 @@ pub async fn update_group_application(
 
 #[utoipa::path(
     delete,
-    path = "/groups/application/{application_id}",
+    path = "/groups/applications/{application_id}",
     responses(
         (status = 200, description = "Successfully deleted application", body = GroupDto),
         (status = 403, description = "Insufficient permissions", body = String),
@@ -255,7 +260,7 @@ pub enum ApplicationAction {
 
 #[utoipa::path(
     post,
-    path = "/groups/application/{application_id}/{application_action}",
+    path = "/groups/applications/{application_id}/{application_action}",
     responses(
         (status = 200, description = "Successfully approved/rejected application", body = GroupDto),
         (status = 403, description = "Insufficient permissions", body = String),
