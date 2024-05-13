@@ -13,7 +13,6 @@ use tower_sessions::Session;
 use utoipa::ToSchema;
 
 use crate::auth::data;
-use crate::auth::data::groups::{add_group_members, delete_group_members};
 use crate::auth::model::groups::{GroupApplicationStatus, GroupApplicationType};
 use crate::auth::permissions::require_permissions;
 
@@ -65,7 +64,7 @@ pub async fn get_group_applications(
         Err(response) => return response,
     };
 
-    match data::groups::get_group_application(
+    match data::groups::applications::get_group_application(
         &db,
         params.application_status.map(|status| status.into()),
         params.application_type.map(|type_| type_.into()),
@@ -120,7 +119,16 @@ pub async fn update_group_application(
         Err(response) => return response,
     };
 
-    match data::groups::get_group_application(&db, None, None, Some(path.0), None, None).await {
+    match data::groups::applications::get_group_application(
+        &db,
+        None,
+        None,
+        Some(path.0),
+        None,
+        None,
+    )
+    .await
+    {
         Ok(application) => {
             if application.is_empty() {
                 return (StatusCode::NOT_FOUND, "Application does not exist").into_response();
@@ -151,7 +159,7 @@ pub async fn update_group_application(
 
     let request_message = application_request_message.0.unwrap_or_default();
 
-    match data::groups::update_group_application(
+    match data::groups::applications::update_group_application(
         &db,
         path.0,
         Some(request_message),
@@ -201,7 +209,16 @@ pub async fn delete_group_application(
         Err(response) => return response,
     };
 
-    match data::groups::get_group_application(&db, None, None, Some(path.0), None, None).await {
+    match data::groups::applications::get_group_application(
+        &db,
+        None,
+        None,
+        Some(path.0),
+        None,
+        None,
+    )
+    .await
+    {
         Ok(application) => {
             if application.is_empty() {
                 return (StatusCode::NOT_FOUND, "Application does not exist").into_response();
@@ -226,7 +243,7 @@ pub async fn delete_group_application(
         }
     };
 
-    match data::groups::delete_group_application(&db, path.0).await {
+    match data::groups::applications::delete_group_application(&db, path.0).await {
         Ok(result) => {
             if result.rows_affected == 0 {
                 return (StatusCode::NOT_FOUND, "Application does not exist").into_response();
@@ -289,7 +306,7 @@ pub async fn accept_reject_application(
         ApplicationAction::Reject => entity::sea_orm_active_enums::GroupApplicationStatus::Rejected,
     };
 
-    let application = match data::groups::update_group_application(
+    let application = match data::groups::applications::update_group_application(
         &db,
         path.0,
         None,
@@ -323,7 +340,13 @@ pub async fn accept_reject_application(
 
     match application.request_type {
         entity::sea_orm_active_enums::GroupApplicationType::Join => {
-            match add_group_members(&db, application.group_id, vec![application.user_id]).await {
+            match data::groups::members::add_group_members(
+                &db,
+                application.group_id,
+                vec![application.user_id],
+            )
+            .await
+            {
                 Ok(_) => {
                     (StatusCode::OK, "Successfully approved group join request").into_response()
                 }
@@ -343,7 +366,13 @@ pub async fn accept_reject_application(
             }
         }
         entity::sea_orm_active_enums::GroupApplicationType::Leave => {
-            match delete_group_members(&db, application.group_id, vec![application.user_id]).await {
+            match data::groups::members::delete_group_members(
+                &db,
+                application.group_id,
+                vec![application.user_id],
+            )
+            .await
+            {
                 Ok(_) => {
                     (StatusCode::OK, "Successfully approved group leave request").into_response()
                 }

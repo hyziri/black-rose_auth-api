@@ -47,7 +47,7 @@ pub async fn join_group(
         Err(response) => return response,
     };
 
-    match data::groups::join_group(&db, group_id.0, user_id, application_text.0).await {
+    match data::groups::members::join_group(&db, group_id.0, user_id, application_text.0).await {
         Ok(application) => match application {
             Some(application) => (StatusCode::OK, Json(application)).into_response(),
             None => (StatusCode::OK, "Joined group successfully").into_response(),
@@ -103,7 +103,7 @@ pub async fn leave_group(
         Err(response) => return response,
     };
 
-    match data::groups::leave_group(&db, group_id.0, user_id, application_text.0).await {
+    match data::groups::members::leave_group(&db, group_id.0, user_id, application_text.0).await {
         Ok(application) => match application {
             Some(application) => (StatusCode::OK, Json(application)).into_response(),
             None => (StatusCode::OK, "Left group successfully").into_response(),
@@ -151,7 +151,7 @@ pub async fn get_group_members(
         Err(response) => return response,
     };
 
-    match data::groups::get_group_members(&db, group_id.0).await {
+    match data::groups::members::get_group_members(&db, group_id.0).await {
         Ok(members) => (StatusCode::OK, Json(members)).into_response(),
         Err(err) => {
             println!("{}", err);
@@ -189,7 +189,7 @@ pub async fn add_group_members(
         Err(response) => return response,
     };
 
-    match data::groups::add_group_members(&db, group_id.0, user_ids.to_vec()).await {
+    match data::groups::members::add_group_members(&db, group_id.0, user_ids.to_vec()).await {
         Ok(_) => (StatusCode::OK, "Users added successfully").into_response(),
         Err(err) => {
             if err.to_string() == "Group does not exist" {
@@ -233,7 +233,7 @@ pub async fn delete_group_members(
 
     let user_ids = user_ids.to_vec();
 
-    match data::groups::delete_group_members(&db, group_id.0, user_ids.to_vec()).await {
+    match data::groups::members::delete_group_members(&db, group_id.0, user_ids.to_vec()).await {
         Ok(_) => (StatusCode::OK, "Users removed successfully").into_response(),
         Err(err) => {
             println!("{}", err);
