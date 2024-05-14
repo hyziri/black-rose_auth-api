@@ -487,7 +487,6 @@ pub async fn update_filter_rules(
         .filter_map(|rule| rule.id)
         .collect();
 
-    // This may delete filter group rules? May be fine if it is feeding filter group id = null.
     entity::prelude::AuthGroupFilterRule::delete_many()
         .filter(entity::auth_group_filter_rule::Column::GroupId.eq(group_id))
         .filter(entity::auth_group_filter_rule::Column::FilterGroupId.eq(filter_group_id))
@@ -501,10 +500,11 @@ pub async fn update_filter_rules(
         if let Some(id) = rule.id {
             let updated_rule = entity::auth_group_filter_rule::ActiveModel {
                 id: Set(id),
+                group_id: Set(group_id),
+                filter_group_id: Set(filter_group_id),
                 criteria: Set(rule.criteria.into()),
                 criteria_type: Set(rule.criteria_type.into()),
                 criteria_value: Set(rule.criteria_value),
-                ..Default::default()
             };
 
             updated_rule.update(db).await?;
@@ -520,6 +520,10 @@ pub async fn update_filter_rules(
 
             new_rules.push(new_rule)
         }
+    }
+
+    if new_rules.is_empty() {
+        return Ok(());
     }
 
     entity::prelude::AuthGroupFilterRule::insert_many(new_rules)

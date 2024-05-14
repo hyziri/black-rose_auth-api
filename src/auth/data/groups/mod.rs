@@ -195,7 +195,7 @@ pub async fn get_group_dto(
 
 pub async fn update_group(
     db: &DatabaseConnection,
-    id: i32,
+    group_id: i32,
     group: UpdateGroupDto,
 ) -> Result<Group, anyhow::Error> {
     match validate_group_filters(db, &group.clone().into()).await {
@@ -218,7 +218,7 @@ pub async fn update_group(
     };
 
     let updated_group = entity::auth_group::ActiveModel {
-        id: Set(id),
+        id: Set(group_id),
         name: Set(group.name),
         description: Set(group.description),
         confidential: Set(group.confidential),
@@ -231,8 +231,8 @@ pub async fn update_group(
 
     let updated_group = updated_group.update(db).await?;
 
-    update_filter_rules(db, id, None, group.filter_rules).await?;
-    update_filter_groups(db, id, group.filter_groups).await?;
+    update_filter_groups(db, group_id, group.filter_groups).await?;
+    update_filter_rules(db, group_id, None, group.filter_rules).await?;
 
     // Queue update group members task
 
