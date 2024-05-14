@@ -4,7 +4,7 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::auth::{model::{
     groups::{
-        GroupApplicationDto, GroupApplicationStatus, GroupApplicationType, GroupDto, GroupFilterCriteria, GroupFilterCriteriaType, GroupFilterGroupDto, GroupFilterRuleDto, GroupFilterType, GroupFiltersDto, GroupOwnerType, GroupType, NewGroupDto, NewGroupFilterGroupDto, NewGroupFilterRuleDto, UpdateGroupDto, UpdateGroupFilterGroupDto, UpdateGroupFilterRuleDto
+        GroupApplicationDto, GroupApplicationStatus, GroupApplicationType, GroupDto, GroupFilterCriteria, GroupFilterCriteriaType, GroupFilterGroupDto, GroupFilterRuleDto, GroupFilterType, GroupFiltersDto, GroupOwnerInfo, GroupOwnerType, GroupType, NewGroupDto, NewGroupFilterGroupDto, NewGroupFilterRuleDto, UpdateGroupDto, UpdateGroupFilterGroupDto, UpdateGroupFilterRuleDto
     },
     user::UserDto,
 }, route::groups::applications::{ApplicationAction, GetGroupApplicationParams}};
@@ -32,7 +32,7 @@ pub fn routes() -> Router {
             UpdateGroupDto, UpdateGroupFilterRuleDto, UpdateGroupFilterGroupDto,
             GroupType, GroupFilterType, GroupFilterCriteria, GroupFilterCriteriaType,
             GroupApplicationDto, GroupApplicationStatus, GroupApplicationType, ApplicationAction,
-            GetGroupApplicationParams, GroupOwnerType)),
+            GetGroupApplicationParams, GroupOwnerType, GroupOwnerInfo)),
         tags(
             (name = "Black Rose Auth API", description = "Black Rose Auth API endpoints")
         )

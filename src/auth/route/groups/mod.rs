@@ -18,7 +18,8 @@ use self::applications::group_application_routes;
 use self::members::group_member_routes;
 
 use crate::auth::data;
-use crate::auth::model::groups::{GroupDto, NewGroupDto, UpdateGroupDto};
+use crate::auth::data::groups::get_group_dto;
+use crate::auth::model::groups::{NewGroupDto, UpdateGroupDto};
 use crate::auth::permissions::require_permissions;
 
 pub fn group_routes() -> Router {
@@ -57,11 +58,24 @@ pub async fn create_group(
     };
 
     match data::groups::create_group(&db, payload).await {
-        Ok(group) => {
-            let dto: GroupDto = group.into();
+        Ok(group) => match get_group_dto(&db, Some(vec![group.id])).await {
+            Ok(mut dto) => {
+                if dto.is_empty() {
+                    return (StatusCode::NOT_FOUND, "Group not found").into_response();
+                }
 
-            (StatusCode::OK, Json(dto)).into_response()
-        }
+                (StatusCode::OK, Json(dto.pop())).into_response()
+            }
+            Err(err) => {
+                println!("{}", err);
+
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Error getting group info",
+                )
+                    .into_response()
+            }
+        },
         Err(err) => {
             if err.is::<sea_orm::error::DbErr>() {
                 println!("{}", err);
@@ -100,12 +114,8 @@ pub async fn get_groups(
         Err(response) => return response,
     };
 
-    match data::groups::get_groups(&db).await {
-        Ok(groups) => {
-            let dto: Vec<GroupDto> = groups.into_iter().map(GroupDto::from).collect();
-
-            (StatusCode::OK, Json(dto)).into_response()
-        }
+    match data::groups::get_group_dto(&db, None).await {
+        Ok(groups) => (StatusCode::OK, Json(groups)).into_response(),
         Err(err) => {
             println!("{}", err);
             (StatusCode::INTERNAL_SERVER_ERROR, "Error getting groups").into_response()
@@ -136,15 +146,14 @@ pub async fn get_group_by_id(
         Err(response) => return response,
     };
 
-    match data::groups::get_group_by_id(&db, group_id.0).await {
-        Ok(group) => match group {
-            Some(group) => {
-                let dto: GroupDto = group.into();
-
-                (StatusCode::OK, Json(dto)).into_response()
+    match get_group_dto(&db, Some(vec![group_id.0])).await {
+        Ok(mut group) => {
+            if group.is_empty() {
+                return (StatusCode::NOT_FOUND, "Group not found").into_response();
             }
-            None => (StatusCode::NOT_FOUND, "Group not found").into_response(),
-        },
+
+            (StatusCode::OK, Json(group.pop())).into_response()
+        }
         Err(err) => {
             println!("{}", err);
             (StatusCode::INTERNAL_SERVER_ERROR, "Error getting groups").into_response()
@@ -217,20 +226,28 @@ pub async fn update_group(
     };
 
     match data::groups::update_group(&db, group_id.0, payload).await {
-        Ok(group) => {
-            let dto: GroupDto = group.into();
+        Ok(group) => match get_group_dto(&db, Some(vec![group.id])).await {
+            Ok(mut dto) => {
+                if dto.is_empty() {
+                    return (StatusCode::NOT_FOUND, "Group not found").into_response();
+                }
 
-            (StatusCode::OK, Json(dto)).into_response()
-        }
+                (StatusCode::OK, Json(dto.pop())).into_response()
+            }
+            Err(err) => {
+                println!("{}", err);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Error getting group info",
+                )
+                    .into_response()
+            }
+        },
         Err(err) => {
             if err.is::<sea_orm::error::DbErr>() {
                 println!("{}", err);
 
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Error creating new group",
-                )
-                    .into_response();
+                return (StatusCode::INTERNAL_SERVER_ERROR, "Error updating group").into_response();
             }
 
             (StatusCode::BAD_REQUEST, err.to_string()).into_response()

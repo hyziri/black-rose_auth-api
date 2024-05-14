@@ -2,13 +2,17 @@ pub mod applications;
 pub mod filters;
 pub mod members;
 
+use std::vec;
+
 use anyhow::anyhow;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
-    QueryFilter,
+    PaginatorTrait, QueryFilter,
 };
 
-use crate::auth::model::groups::{GroupOwnerType, NewGroupDto, UpdateGroupDto};
+use crate::auth::model::groups::{
+    GroupDto, GroupOwnerInfo, GroupOwnerType, NewGroupDto, UpdateGroupDto,
+};
 
 use entity::auth_group::Model as Group;
 
@@ -109,10 +113,6 @@ pub async fn create_group(
     Ok(group)
 }
 
-pub async fn get_groups(db: &DatabaseConnection) -> Result<Vec<Group>, DbErr> {
-    entity::prelude::AuthGroup::find().all(db).await
-}
-
 pub async fn get_group_by_id(db: &DatabaseConnection, id: i32) -> Result<Option<Group>, DbErr> {
     entity::prelude::AuthGroup::find()
         .filter(entity::auth_group::Column::Id.eq(id))
@@ -120,14 +120,77 @@ pub async fn get_group_by_id(db: &DatabaseConnection, id: i32) -> Result<Option<
         .await
 }
 
-pub async fn bulk_get_groups_by_id(
+pub async fn get_group_dto(
     db: &DatabaseConnection,
-    ids: Vec<i32>,
-) -> Result<Vec<Group>, DbErr> {
-    entity::prelude::AuthGroup::find()
-        .filter(entity::auth_group::Column::Id.is_in(ids))
-        .all(db)
-        .await
+    // Set None to get all groups
+    groups: Option<Vec<i32>>,
+) -> Result<Vec<GroupDto>, anyhow::Error> {
+    use crate::eve::data;
+    use entity::sea_orm_active_enums::GroupOwnerType;
+
+    let mut group_results = vec![];
+
+    let mut query = entity::prelude::AuthGroup::find();
+
+    if let Some(groups) = groups {
+        query = query.filter(entity::auth_group::Column::Id.is_in(groups))
+    }
+
+    let groups = query.all(db).await?;
+
+    for group in groups {
+        let owner_info: Option<GroupOwnerInfo> = match &group.owner_type {
+            GroupOwnerType::Auth => None,
+            GroupOwnerType::Alliance => {
+                if let Some(owner_id) = group.owner_id {
+                    let alliance = data::alliance::create_alliance(db, owner_id).await?;
+                    Some(GroupOwnerInfo {
+                        id: alliance.alliance_id,
+                        name: alliance.alliance_name,
+                    })
+                } else {
+                    return Err(anyhow!("Group owner_id for owner type alliance is None"));
+                }
+            }
+            GroupOwnerType::Corporation => {
+                if let Some(owner_id) = group.owner_id {
+                    let corporation = data::corporation::create_corporation(db, owner_id).await?;
+                    Some(GroupOwnerInfo {
+                        id: corporation.corporation_id,
+                        name: corporation.corporation_name,
+                    })
+                } else {
+                    return Err(anyhow!("Group owner_id for owner type corporation is None"));
+                }
+            }
+        };
+
+        // TODO: move this out of for loop & get the count for all groups at once
+        let member_count = if !group.confidential {
+            let member_count = entity::prelude::AuthGroupUser::find()
+                .filter(entity::auth_group_user::Column::GroupId.eq(group.id))
+                .count(db)
+                .await?;
+
+            Some(member_count)
+        } else {
+            None
+        };
+
+        let group = GroupDto {
+            id: group.id,
+            name: group.name,
+            description: group.description,
+            group_type: group.group_type.into(),
+            owner_type: group.owner_type.into(),
+            owner_info,
+            member_count,
+        };
+
+        group_results.push(group);
+    }
+
+    Ok(group_results)
 }
 
 pub async fn update_group(

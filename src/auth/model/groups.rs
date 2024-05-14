@@ -244,22 +244,20 @@ impl From<entity::sea_orm_active_enums::GroupOwnerType> for GroupOwnerType {
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
+pub struct GroupOwnerInfo {
+    pub id: i32,
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct GroupDto {
     pub id: i32,
     pub name: String,
     pub description: Option<String>,
     pub group_type: GroupType,
-}
-
-impl From<entity::auth_group::Model> for GroupDto {
-    fn from(model: entity::auth_group::Model) -> Self {
-        GroupDto {
-            id: model.id,
-            name: model.name,
-            description: model.description,
-            group_type: model.group_type.into(),
-        }
-    }
+    pub owner_type: GroupOwnerType,
+    pub owner_info: Option<GroupOwnerInfo>,
+    pub member_count: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
