@@ -74,13 +74,7 @@ pub async fn create_group(
 ) -> Result<Group, anyhow::Error> {
     match validate_group_filters(db, &new_group).await {
         Ok(_) => (),
-        Err(err) => {
-            if err.is::<sea_orm::DbErr>() {
-                return Err(err);
-            }
-
-            return Err(err);
-        }
+        Err(err) => return Err(err),
     }
 
     validate_group_owner(db, &new_group.owner_type, new_group.owner_id).await?;

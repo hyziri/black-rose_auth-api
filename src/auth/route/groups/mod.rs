@@ -118,6 +118,7 @@ pub async fn get_groups(
         Ok(groups) => (StatusCode::OK, Json(groups)).into_response(),
         Err(err) => {
             println!("{}", err);
+
             (StatusCode::INTERNAL_SERVER_ERROR, "Error getting groups").into_response()
         }
     }
@@ -156,6 +157,7 @@ pub async fn get_group_by_id(
         }
         Err(err) => {
             println!("{}", err);
+
             (StatusCode::INTERNAL_SERVER_ERROR, "Error getting groups").into_response()
         }
     }
@@ -244,13 +246,16 @@ pub async fn update_group(
             }
         },
         Err(err) => {
-            if err.is::<sea_orm::error::DbErr>() {
-                println!("{}", err);
-
-                return (StatusCode::INTERNAL_SERVER_ERROR, "Error updating group").into_response();
+            let err_string = err.to_string();
+            if err_string.contains("Filter rule with id")
+                && err_string.contains("does not belong to group")
+            {
+                return (StatusCode::FORBIDDEN, err_string).into_response();
             }
 
-            (StatusCode::BAD_REQUEST, err.to_string()).into_response()
+            println!("{}", err);
+
+            (StatusCode::INTERNAL_SERVER_ERROR, "Error updating group").into_response()
         }
     }
 }
