@@ -210,8 +210,8 @@ mod tests {
 
         let mut retrieved_alliances = repo.get_many(&created_alliance_ids).await?;
 
-        created_alliances.sort_by_key(|a| a.alliance_id);
-        retrieved_alliances.sort_by_key(|a| a.alliance_id);
+        created_alliances.sort_by_key(|a| a.id);
+        retrieved_alliances.sort_by_key(|a| a.id);
 
         assert_eq!(retrieved_alliances, created_alliances);
 

@@ -7,12 +7,12 @@ use entity::eve_corporation::Model as Corporation;
 
 use crate::eve::data::alliance::create_alliance;
 
-pub struct CorporationRepository {
-    db: DatabaseConnection,
+pub struct CorporationRepository<'a> {
+    db: &'a DatabaseConnection,
 }
 
-impl CorporationRepository {
-    pub fn new(db: DatabaseConnection) -> Self {
+impl<'a> CorporationRepository<'a> {
+    pub fn new(db: &'a DatabaseConnection) -> Self {
         Self { db }
     }
 
@@ -32,7 +32,7 @@ impl CorporationRepository {
             ..Default::default()
         };
 
-        new_corporation.insert(&self.db).await
+        new_corporation.insert(self.db).await
     }
 
     pub async fn get_one(
@@ -41,7 +41,7 @@ impl CorporationRepository {
     ) -> Result<Option<Corporation>, sea_orm::DbErr> {
         EveCorporation::find()
             .filter(entity::eve_corporation::Column::CorporationId.eq(corporation_id))
-            .one(&self.db)
+            .one(self.db)
             .await
     }
 
@@ -54,7 +54,7 @@ impl CorporationRepository {
 
         EveCorporation::find()
             .filter(entity::eve_corporation::Column::CorporationId.is_in(corporation_ids))
-            .all(&self.db)
+            .all(self.db)
             .await
     }
 }
@@ -112,4 +112,145 @@ pub async fn bulk_get_corporations(
         .filter(entity::eve_corporation::Column::CorporationId.is_in(unique_corp_ids))
         .all(db)
         .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::{distributions::Alphanumeric, Rng};
+    use sea_orm::{ConnectionTrait, Database, DbBackend, Schema};
+
+    #[tokio::test]
+    async fn create_corporation() -> Result<(), sea_orm::DbErr> {
+        let db = Database::connect("sqlite::memory:").await?;
+        let schema = Schema::new(DbBackend::Sqlite);
+
+        let stmts = vec![
+            schema.create_table_from_entity(entity::prelude::EveCorporation),
+            schema.create_table_from_entity(entity::prelude::EveAlliance),
+        ];
+
+        for stmt in stmts {
+            let _ = db.execute(db.get_database_backend().build(&stmt)).await?;
+        }
+
+        let repo = CorporationRepository::new(&db);
+
+        let mut rng = rand::thread_rng();
+
+        let corporation_id = rng.gen::<i32>();
+        let alliance_id = None;
+        let ceo = rng.gen::<i32>();
+        let corporation_name = rng
+            .sample_iter(&Alphanumeric)
+            .take(30)
+            .map(char::from)
+            .collect::<String>();
+
+        let created_corporation = repo
+            .create(corporation_id, corporation_name.clone(), alliance_id, ceo)
+            .await?;
+
+        assert_eq!(created_corporation.corporation_id, corporation_id);
+        assert_eq!(created_corporation.corporation_name, corporation_name);
+        assert_eq!(created_corporation.alliance_id, alliance_id);
+        assert_eq!(created_corporation.ceo, ceo);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn get_one_corporation() -> Result<(), sea_orm::DbErr> {
+        let db = Database::connect("sqlite::memory:").await?;
+        let schema = Schema::new(DbBackend::Sqlite);
+
+        let stmts = vec![
+            schema.create_table_from_entity(entity::prelude::EveCorporation),
+            schema.create_table_from_entity(entity::prelude::EveAlliance),
+        ];
+
+        for stmt in stmts {
+            let _ = db.execute(db.get_database_backend().build(&stmt)).await?;
+        }
+
+        let repo = CorporationRepository::new(&db);
+
+        let mut rng = rand::thread_rng();
+
+        let corporation_id = rng.gen::<i32>();
+        let alliance_id = None;
+        let ceo = rng.gen::<i32>();
+        let corporation_name = rng
+            .sample_iter(&Alphanumeric)
+            .take(30)
+            .map(char::from)
+            .collect::<String>();
+
+        let created_corporation = repo
+            .create(corporation_id, corporation_name.clone(), alliance_id, ceo)
+            .await?;
+
+        let retrieved_corporation = repo.get_one(corporation_id).await?;
+
+        assert_eq!(retrieved_corporation.unwrap(), created_corporation);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn get_many_corporations() -> Result<(), sea_orm::DbErr> {
+        let db = Database::connect("sqlite::memory:").await?;
+        let schema = Schema::new(DbBackend::Sqlite);
+
+        let stmts = vec![
+            schema.create_table_from_entity(entity::prelude::EveCorporation),
+            schema.create_table_from_entity(entity::prelude::EveAlliance),
+        ];
+
+        for stmt in stmts {
+            let _ = db.execute(db.get_database_backend().build(&stmt)).await?;
+        }
+
+        let repo = CorporationRepository::new(&db);
+
+        let mut rng = rand::thread_rng();
+        let mut created_corporations = Vec::new();
+
+        let mut generated_ids = std::collections::HashSet::new();
+        for _ in 0..5 {
+            let mut corporation_id = rng.gen::<i32>();
+            while generated_ids.contains(&corporation_id) {
+                corporation_id = rng.gen::<i32>();
+            }
+            generated_ids.insert(corporation_id);
+
+            let alliance_id = None;
+            let ceo = rng.gen::<i32>();
+            let corporation_name = (&mut rng)
+                .sample_iter(&Alphanumeric)
+                .take(30)
+                .map(char::from)
+                .collect::<String>();
+
+            let created_corporation = repo
+                .create(corporation_id, corporation_name.clone(), alliance_id, ceo)
+                .await?;
+
+            created_corporations.push(created_corporation);
+        }
+
+        let created_corporation_ids = created_corporations
+            .iter()
+            .map(|c| c.corporation_id)
+            .collect::<Vec<i32>>();
+
+        let mut retrieved_corporations = repo.get_many(&created_corporation_ids).await?;
+
+        created_corporations.sort_by_key(|c| c.id);
+        retrieved_corporations.sort_by_key(|c| c.id);
+
+        assert_eq!(retrieved_corporations, created_corporations);
+
+        Ok(())
+    }
 }
