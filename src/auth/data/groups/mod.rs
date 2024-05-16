@@ -5,13 +5,15 @@ pub mod members;
 use std::vec;
 
 use anyhow::anyhow;
+use eve_esi::alliance::get_alliance;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
     PaginatorTrait, QueryFilter,
 };
 
-use crate::auth::model::groups::{
-    GroupDto, GroupOwnerInfo, GroupOwnerType, NewGroupDto, UpdateGroupDto,
+use crate::{
+    auth::model::groups::{GroupDto, GroupOwnerInfo, GroupOwnerType, NewGroupDto, UpdateGroupDto},
+    eve::data::alliance::AllianceRepository,
 };
 
 use entity::auth_group::Model as Group;
@@ -37,16 +39,19 @@ async fn validate_group_owner(
         GroupOwnerType::Auth => (),
         GroupOwnerType::Alliance => {
             if let Some(owner_id) = owner_id {
-                match data::alliance::create_alliance(db, owner_id).await {
-                    Ok(_) => (),
-                    Err(err) => {
-                        if err.is::<reqwest::Error>() {
-                            return Err(anyhow!("Alliance not found: {}", owner_id));
-                        }
+                let alliance_repo = AllianceRepository::new(db);
 
-                        return Err(err);
-                    }
-                };
+                let filters = vec![entity::eve_alliance::Column::AllianceId.eq(owner_id)];
+
+                let alliance = alliance_repo.get_by_filtered(filters, 0, 1).await?;
+
+                if alliance.is_empty() {
+                    let alliance = get_alliance(owner_id).await?;
+
+                    alliance_repo
+                        .create(owner_id, alliance.name, alliance.executor_corporation_id)
+                        .await?;
+                }
             }
         }
         GroupOwnerType::Corporation => {
@@ -137,10 +142,25 @@ pub async fn get_group_dto(
             GroupOwnerType::Auth => None,
             GroupOwnerType::Alliance => {
                 if let Some(owner_id) = group.owner_id {
-                    let alliance = data::alliance::create_alliance(db, owner_id).await?;
+                    let alliance_repo = AllianceRepository::new(db);
+
+                    let filters = vec![entity::eve_alliance::Column::AllianceId.eq(owner_id)];
+
+                    let mut alliance = alliance_repo.get_by_filtered(filters, 0, 1).await?;
+
+                    let alliance_info = if alliance.is_empty() {
+                        let alliance = get_alliance(owner_id).await?;
+
+                        alliance_repo
+                            .create(owner_id, alliance.name, alliance.executor_corporation_id)
+                            .await?
+                    } else {
+                        alliance.pop().unwrap()
+                    };
+
                     Some(GroupOwnerInfo {
-                        id: alliance.alliance_id,
-                        name: alliance.alliance_name,
+                        id: alliance_info.alliance_id,
+                        name: alliance_info.alliance_name,
                     })
                 } else {
                     return Err(anyhow!("Group owner_id for owner type alliance is None"));

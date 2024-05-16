@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait,
     QueryFilter,
@@ -54,67 +52,18 @@ impl<'a> AllianceRepository<'a> {
 
     pub async fn get_by_filtered(
         &self,
-        filter: Vec<(entity::eve_alliance::Column, sea_orm::Value)>,
+        filters: Vec<migration::SimpleExpr>,
         page: u64,
         page_size: u64,
     ) -> Result<Vec<Alliance>, sea_orm::DbErr> {
         let mut query = EveAlliance::find();
 
-        for (column, value) in filter {
-            query = query.filter(column.eq(value));
+        for filter in filters {
+            query = query.filter(filter);
         }
 
         query.paginate(self.db, page_size).fetch_page(page).await
     }
-}
-
-pub async fn get_alliance(
-    db: &DatabaseConnection,
-    alliance_id: i32,
-) -> Result<Option<Alliance>, sea_orm::DbErr> {
-    EveAlliance::find()
-        .filter(entity::eve_alliance::Column::AllianceId.eq(alliance_id))
-        .one(db)
-        .await
-}
-
-pub async fn create_alliance(
-    db: &DatabaseConnection,
-    alliance_id: i32,
-) -> Result<Alliance, anyhow::Error> {
-    match get_alliance(db, alliance_id).await? {
-        Some(alliance) => Ok(alliance),
-        None => {
-            let alliance = eve_esi::alliance::get_alliance(alliance_id).await?;
-
-            let alliance = entity::eve_alliance::ActiveModel {
-                alliance_id: ActiveValue::Set(alliance_id),
-                alliance_name: ActiveValue::Set(alliance.name),
-                executor: ActiveValue::Set(alliance.executor_corporation_id),
-                ..Default::default()
-            };
-
-            let alliance: Alliance = alliance.insert(db).await?;
-
-            Ok(alliance)
-        }
-    }
-}
-
-pub async fn bulk_get_alliances(
-    db: &DatabaseConnection,
-    alliance_ids: Vec<i32>,
-) -> Result<Vec<Alliance>, sea_orm::DbErr> {
-    let unique_alliance_ids: Vec<i32> = alliance_ids
-        .into_iter()
-        .collect::<HashSet<_>>()
-        .into_iter()
-        .collect();
-
-    entity::prelude::EveAlliance::find()
-        .filter(entity::eve_alliance::Column::AllianceId.is_in(unique_alliance_ids))
-        .all(db)
-        .await
 }
 
 #[cfg(test)]
@@ -270,10 +219,8 @@ mod tests {
             created_alliances.push(created_alliance);
         }
 
-        let filters = vec![(
-            entity::eve_alliance::Column::AllianceId,
-            created_alliances[0].alliance_id.into(),
-        )];
+        let filters =
+            vec![entity::eve_alliance::Column::AllianceId.eq(created_alliances[0].alliance_id)];
 
         let retrieved_alliances = repo.get_by_filtered(filters, 0, 5).await?;
 

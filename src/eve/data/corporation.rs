@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use entity::prelude::EveCorporation;
+use eve_esi::alliance::get_alliance;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
     Set,
@@ -8,7 +9,7 @@ use sea_orm::{
 
 use entity::eve_corporation::Model as Corporation;
 
-use crate::eve::data::alliance::create_alliance;
+use super::alliance::AllianceRepository;
 
 pub struct CorporationRepository<'a> {
     db: &'a DatabaseConnection,
@@ -59,14 +60,14 @@ impl<'a> CorporationRepository<'a> {
 
     pub async fn get_by_filtered(
         &self,
-        filter: Vec<(entity::eve_corporation::Column, sea_orm::Value)>,
+        filters: Vec<migration::SimpleExpr>,
         page: u64,
         page_size: u64,
     ) -> Result<Vec<Corporation>, sea_orm::DbErr> {
         let mut query = EveCorporation::find();
 
-        for (column, value) in filter {
-            query = query.filter(column.eq(value));
+        for filter in filters {
+            query = query.filter(filter);
         }
 
         query.paginate(self.db, page_size).fetch_page(page).await
@@ -102,7 +103,13 @@ pub async fn create_corporation(
             };
 
             if let Some(alliance_id) = corporation.alliance_id {
-                let _ = create_alliance(db, alliance_id).await;
+                let alliance = get_alliance(alliance_id).await?;
+
+                let alliance_repo = AllianceRepository::new(db);
+
+                let _ = alliance_repo
+                    .create(alliance_id, alliance.name, alliance.executor_corporation_id)
+                    .await?;
             }
 
             let corporation: Corporation = new_corporation.insert(db).await?;
@@ -310,10 +317,8 @@ mod tests {
             created_corporations.push(created_corporation);
         }
 
-        let filters = vec![(
-            entity::eve_corporation::Column::CorporationId,
-            created_corporations[0].corporation_id.into(),
-        )];
+        let filters = vec![entity::eve_corporation::Column::CorporationId
+            .eq(created_corporations[0].corporation_id)];
 
         let retrieved_corporations = repo.get_by_filtered(filters, 0, 5).await?;
 

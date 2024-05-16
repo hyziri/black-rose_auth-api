@@ -9,7 +9,7 @@ use crate::eve::{
     data::corporation::create_corporation, model::character::CharacterAffiliationDto,
 };
 
-use super::{alliance::bulk_get_alliances, corporation::bulk_get_corporations};
+use super::{alliance::AllianceRepository, corporation::bulk_get_corporations};
 
 pub async fn create_character(
     db: &DatabaseConnection,
@@ -94,7 +94,14 @@ pub async fn bulk_get_character_affiliations(
         .filter_map(|corporation| corporation.alliance_id)
         .collect();
     let unique_alliance_ids: Vec<i32> = alliance_ids.into_iter().collect();
-    let alliances = bulk_get_alliances(db, unique_alliance_ids).await?;
+
+    let alliance_repo = AllianceRepository::new(db);
+
+    // FILTER NEEDS TO HANDLE IS_IN
+
+    let alliances = alliance_repo
+        .get_many(&unique_alliance_ids, 0, unique_alliance_ids.len() as u64)
+        .await?;
 
     let mut character_affiliations: Vec<CharacterAffiliationDto> = Vec::new();
 
