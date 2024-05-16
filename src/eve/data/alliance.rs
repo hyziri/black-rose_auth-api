@@ -32,18 +32,15 @@ impl<'a> AllianceRepository<'a> {
         new_alliance.insert(self.db).await
     }
 
-    pub async fn get_one(&self, alliance_id: i32) -> Result<Option<Alliance>, sea_orm::DbErr> {
-        EveAlliance::find()
-            .filter(entity::eve_alliance::Column::AllianceId.eq(alliance_id))
-            .one(self.db)
-            .await
+    pub async fn get_one(&self, id: i32) -> Result<Option<Alliance>, sea_orm::DbErr> {
+        EveAlliance::find_by_id(id).one(self.db).await
     }
 
-    pub async fn get_many(&self, alliance_ids: &[i32]) -> Result<Vec<Alliance>, sea_orm::DbErr> {
-        let alliance_ids: Vec<sea_orm::Value> = alliance_ids.iter().map(|&id| id.into()).collect();
+    pub async fn get_many(&self, ids: &[i32]) -> Result<Vec<Alliance>, sea_orm::DbErr> {
+        let ids: Vec<sea_orm::Value> = ids.iter().map(|&id| id.into()).collect();
 
         EveAlliance::find()
-            .filter(entity::eve_alliance::Column::AllianceId.is_in(alliance_ids))
+            .filter(entity::eve_alliance::Column::Id.is_in(ids))
             .all(self.db)
             .await
     }
@@ -160,7 +157,7 @@ mod tests {
             .create(alliance_id, alliance_name.clone(), executor)
             .await?;
 
-        let retrieved_alliance = repo.get_one(alliance_id).await?;
+        let retrieved_alliance = repo.get_one(created_alliance.id).await?;
 
         assert_eq!(retrieved_alliance.unwrap(), created_alliance);
 
@@ -203,10 +200,7 @@ mod tests {
             created_alliances.push(created_alliance);
         }
 
-        let created_alliance_ids = created_alliances
-            .iter()
-            .map(|a| a.alliance_id)
-            .collect::<Vec<i32>>();
+        let created_alliance_ids = created_alliances.iter().map(|a| a.id).collect::<Vec<i32>>();
 
         let mut retrieved_alliances = repo.get_many(&created_alliance_ids).await?;
 

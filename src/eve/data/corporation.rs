@@ -35,25 +35,15 @@ impl<'a> CorporationRepository<'a> {
         new_corporation.insert(self.db).await
     }
 
-    pub async fn get_one(
-        &self,
-        corporation_id: i32,
-    ) -> Result<Option<Corporation>, sea_orm::DbErr> {
-        EveCorporation::find()
-            .filter(entity::eve_corporation::Column::CorporationId.eq(corporation_id))
-            .one(self.db)
-            .await
+    pub async fn get_one(&self, id: i32) -> Result<Option<Corporation>, sea_orm::DbErr> {
+        EveCorporation::find_by_id(id).one(self.db).await
     }
 
-    pub async fn get_many(
-        &self,
-        corporation_ids: &[i32],
-    ) -> Result<Vec<Corporation>, sea_orm::DbErr> {
-        let corporation_ids: Vec<sea_orm::Value> =
-            corporation_ids.iter().map(|&id| id.into()).collect();
+    pub async fn get_many(&self, ids: &[i32]) -> Result<Vec<Corporation>, sea_orm::DbErr> {
+        let ids: Vec<sea_orm::Value> = ids.iter().map(|&id| id.into()).collect();
 
         EveCorporation::find()
-            .filter(entity::eve_corporation::Column::CorporationId.is_in(corporation_ids))
+            .filter(entity::eve_corporation::Column::Id.is_in(ids))
             .all(self.db)
             .await
     }
@@ -190,7 +180,7 @@ mod tests {
             .create(corporation_id, corporation_name.clone(), alliance_id, ceo)
             .await?;
 
-        let retrieved_corporation = repo.get_one(corporation_id).await?;
+        let retrieved_corporation = repo.get_one(created_corporation.id).await?;
 
         assert_eq!(retrieved_corporation.unwrap(), created_corporation);
 
@@ -241,7 +231,7 @@ mod tests {
 
         let created_corporation_ids = created_corporations
             .iter()
-            .map(|c| c.corporation_id)
+            .map(|c| c.id)
             .collect::<Vec<i32>>();
 
         let mut retrieved_corporations = repo.get_many(&created_corporation_ids).await?;
