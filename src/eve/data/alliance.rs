@@ -1,7 +1,8 @@
 use std::collections::HashSet;
 
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
+    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait,
+    QueryFilter,
 };
 
 use entity::eve_alliance::Model as Alliance;
@@ -36,13 +37,34 @@ impl<'a> AllianceRepository<'a> {
         EveAlliance::find_by_id(id).one(self.db).await
     }
 
-    pub async fn get_many(&self, ids: &[i32]) -> Result<Vec<Alliance>, sea_orm::DbErr> {
+    pub async fn get_many(
+        &self,
+        ids: &[i32],
+        page: u64,
+        page_size: u64,
+    ) -> Result<Vec<Alliance>, sea_orm::DbErr> {
         let ids: Vec<sea_orm::Value> = ids.iter().map(|&id| id.into()).collect();
 
         EveAlliance::find()
             .filter(entity::eve_alliance::Column::Id.is_in(ids))
-            .all(self.db)
+            .paginate(self.db, page_size)
+            .fetch_page(page)
             .await
+    }
+
+    pub async fn get_by_filtered(
+        &self,
+        filter: Vec<(entity::eve_alliance::Column, sea_orm::Value)>,
+        page: u64,
+        page_size: u64,
+    ) -> Result<Vec<Alliance>, sea_orm::DbErr> {
+        let mut query = EveAlliance::find();
+
+        for (column, value) in filter {
+            query = query.filter(column.eq(value));
+        }
+
+        query.paginate(self.db, page_size).fetch_page(page).await
     }
 }
 
@@ -202,12 +224,60 @@ mod tests {
 
         let created_alliance_ids = created_alliances.iter().map(|a| a.id).collect::<Vec<i32>>();
 
-        let mut retrieved_alliances = repo.get_many(&created_alliance_ids).await?;
+        let mut retrieved_alliances = repo.get_many(&created_alliance_ids, 0, 5).await?;
 
         created_alliances.sort_by_key(|a| a.id);
         retrieved_alliances.sort_by_key(|a| a.id);
 
         assert_eq!(retrieved_alliances, created_alliances);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn get_filtered_alliances() -> Result<(), sea_orm::DbErr> {
+        let db = Database::connect("sqlite::memory:").await?;
+
+        let schema = Schema::new(DbBackend::Sqlite);
+        let stmt = schema.create_table_from_entity(entity::prelude::EveAlliance);
+
+        let _ = db.execute(db.get_database_backend().build(&stmt)).await?;
+
+        let repo = AllianceRepository::new(&db);
+
+        let mut rng = rand::thread_rng();
+        let mut created_alliances = Vec::new();
+
+        let mut generated_ids = std::collections::HashSet::new();
+        for _ in 0..5 {
+            let mut alliance_id = rng.gen::<i32>();
+            while generated_ids.contains(&alliance_id) {
+                alliance_id = rng.gen::<i32>();
+            }
+            generated_ids.insert(alliance_id);
+
+            let executor = Some(rng.gen::<i32>());
+            let alliance_name: String = (&mut rng)
+                .sample_iter(&Alphanumeric)
+                .take(30)
+                .map(char::from)
+                .collect();
+
+            let created_alliance = repo
+                .create(alliance_id, alliance_name.clone(), executor)
+                .await?;
+
+            created_alliances.push(created_alliance);
+        }
+
+        let filters = vec![(
+            entity::eve_alliance::Column::AllianceId,
+            created_alliances[0].alliance_id.into(),
+        )];
+
+        let retrieved_alliances = repo.get_by_filtered(filters, 0, 5).await?;
+
+        assert_eq!(retrieved_alliances.len(), 1);
 
         Ok(())
     }

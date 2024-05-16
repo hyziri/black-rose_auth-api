@@ -1,7 +1,10 @@
 use std::collections::HashSet;
 
 use entity::prelude::EveCorporation;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
+    Set,
+};
 
 use entity::eve_corporation::Model as Corporation;
 
@@ -39,13 +42,34 @@ impl<'a> CorporationRepository<'a> {
         EveCorporation::find_by_id(id).one(self.db).await
     }
 
-    pub async fn get_many(&self, ids: &[i32]) -> Result<Vec<Corporation>, sea_orm::DbErr> {
+    pub async fn get_many(
+        &self,
+        ids: &[i32],
+        page: u64,
+        page_size: u64,
+    ) -> Result<Vec<Corporation>, sea_orm::DbErr> {
         let ids: Vec<sea_orm::Value> = ids.iter().map(|&id| id.into()).collect();
 
         EveCorporation::find()
             .filter(entity::eve_corporation::Column::Id.is_in(ids))
-            .all(self.db)
+            .paginate(self.db, page_size)
+            .fetch_page(page)
             .await
+    }
+
+    pub async fn get_by_filtered(
+        &self,
+        filter: Vec<(entity::eve_corporation::Column, sea_orm::Value)>,
+        page: u64,
+        page_size: u64,
+    ) -> Result<Vec<Corporation>, sea_orm::DbErr> {
+        let mut query = EveCorporation::find();
+
+        for (column, value) in filter {
+            query = query.filter(column.eq(value));
+        }
+
+        query.paginate(self.db, page_size).fetch_page(page).await
     }
 }
 
@@ -234,12 +258,66 @@ mod tests {
             .map(|c| c.id)
             .collect::<Vec<i32>>();
 
-        let mut retrieved_corporations = repo.get_many(&created_corporation_ids).await?;
+        let mut retrieved_corporations = repo.get_many(&created_corporation_ids, 0, 5).await?;
 
         created_corporations.sort_by_key(|c| c.id);
         retrieved_corporations.sort_by_key(|c| c.id);
 
         assert_eq!(retrieved_corporations, created_corporations);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn get_filtered_corporations() -> Result<(), sea_orm::DbErr> {
+        let db = Database::connect("sqlite::memory:").await?;
+        let schema = Schema::new(DbBackend::Sqlite);
+
+        let stmts = vec![
+            schema.create_table_from_entity(entity::prelude::EveCorporation),
+            schema.create_table_from_entity(entity::prelude::EveAlliance),
+        ];
+
+        for stmt in stmts {
+            let _ = db.execute(db.get_database_backend().build(&stmt)).await?;
+        }
+
+        let repo = CorporationRepository::new(&db);
+
+        let mut rng = rand::thread_rng();
+        let mut created_corporations = Vec::new();
+
+        let mut generated_ids = std::collections::HashSet::new();
+        for _ in 0..5 {
+            let mut corporation_id = rng.gen::<i32>();
+            while generated_ids.contains(&corporation_id) {
+                corporation_id = rng.gen::<i32>();
+            }
+            generated_ids.insert(corporation_id);
+
+            let alliance_id = None;
+            let ceo = rng.gen::<i32>();
+            let corporation_name = (&mut rng)
+                .sample_iter(&Alphanumeric)
+                .take(30)
+                .map(char::from)
+                .collect::<String>();
+
+            let created_corporation = repo
+                .create(corporation_id, corporation_name.clone(), alliance_id, ceo)
+                .await?;
+
+            created_corporations.push(created_corporation);
+        }
+
+        let filters = vec![(
+            entity::eve_corporation::Column::CorporationId,
+            created_corporations[0].corporation_id.into(),
+        )];
+
+        let retrieved_corporations = repo.get_by_filtered(filters, 0, 5).await?;
+
+        assert_eq!(retrieved_corporations.len(), 1);
 
         Ok(())
     }
