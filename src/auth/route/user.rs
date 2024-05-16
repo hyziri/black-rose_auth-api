@@ -10,10 +10,10 @@ use tower_sessions::Session;
 use crate::{
     auth::{
         data::{
-            groups::bulk_get_groups_by_id,
+            groups::get_group_dto,
             user::{bulk_get_user_groups, get_user_character_ownerships},
         },
-        model::{groups::GroupDto, user::UserDto},
+        model::user::UserDto,
     },
     eve::data::character::{bulk_get_character_affiliations, get_character},
 };
@@ -256,12 +256,8 @@ pub async fn get_user_groups(
         }
     };
 
-    match bulk_get_groups_by_id(&db, group_ids).await {
-        Ok(groups) => {
-            let groups: Vec<GroupDto> = groups.into_iter().map(GroupDto::from).collect();
-
-            (StatusCode::OK, Json(groups)).into_response()
-        }
+    match get_group_dto(&db, Some(group_ids)).await {
+        Ok(groups) => (StatusCode::OK, Json(groups)).into_response(),
         Err(err) => {
             println!("{}", err);
 

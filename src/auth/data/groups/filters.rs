@@ -433,7 +433,7 @@ pub async fn update_filter_groups(
     db: &DatabaseConnection,
     group_id: i32,
     groups: Vec<UpdateGroupFilterGroupDto>,
-) -> Result<(), DbErr> {
+) -> Result<(), anyhow::Error> {
     let group_ids: Vec<i32> = groups
         .clone()
         .into_iter()
@@ -480,20 +480,40 @@ pub async fn update_filter_rules(
     group_id: i32,
     filter_group_id: Option<i32>,
     rules: Vec<UpdateGroupFilterRuleDto>,
-) -> Result<(), DbErr> {
-    let rule_ids: Vec<i32> = rules
-        .clone()
-        .into_iter()
+) -> Result<(), anyhow::Error> {
+    let rule_ids = rules
+        .iter()
         .filter_map(|rule| rule.id)
-        .collect();
+        .collect::<Vec<i32>>();
 
-    // This may delete filter group rules? May be fine if it is feeding filter group id = null.
     entity::prelude::AuthGroupFilterRule::delete_many()
         .filter(entity::auth_group_filter_rule::Column::GroupId.eq(group_id))
         .filter(entity::auth_group_filter_rule::Column::FilterGroupId.eq(filter_group_id))
-        .filter(entity::auth_group_filter_rule::Column::Id.is_not_in(rule_ids))
+        .filter(entity::auth_group_filter_rule::Column::Id.is_not_in(rule_ids.clone()))
         .exec(db)
         .await?;
+
+    let existing_rules = entity::prelude::AuthGroupFilterRule::find()
+        .filter(entity::auth_group_filter_rule::Column::GroupId.eq(group_id))
+        .all(db)
+        .await?;
+
+    let existing_rule_ids = existing_rules
+        .iter()
+        .map(|rule| rule.id)
+        .collect::<Vec<i32>>();
+
+    let invalid_id = rule_ids
+        .iter()
+        .find(|rule_id| !existing_rule_ids.contains(rule_id));
+
+    if let Some(invalid_id) = invalid_id {
+        return Err(anyhow!(
+            "Filter rule with id {} does not belong to group {}",
+            invalid_id,
+            group_id
+        ));
+    }
 
     let mut new_rules: Vec<entity::auth_group_filter_rule::ActiveModel> = vec![];
 
@@ -501,10 +521,11 @@ pub async fn update_filter_rules(
         if let Some(id) = rule.id {
             let updated_rule = entity::auth_group_filter_rule::ActiveModel {
                 id: Set(id),
+                group_id: Set(group_id),
+                filter_group_id: Set(filter_group_id),
                 criteria: Set(rule.criteria.into()),
                 criteria_type: Set(rule.criteria_type.into()),
                 criteria_value: Set(rule.criteria_value),
-                ..Default::default()
             };
 
             updated_rule.update(db).await?;
@@ -520,6 +541,10 @@ pub async fn update_filter_rules(
 
             new_rules.push(new_rule)
         }
+    }
+
+    if new_rules.is_empty() {
+        return Ok(());
     }
 
     entity::prelude::AuthGroupFilterRule::insert_many(new_rules)
