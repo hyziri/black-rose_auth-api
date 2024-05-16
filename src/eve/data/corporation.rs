@@ -7,6 +7,58 @@ use entity::eve_corporation::Model as Corporation;
 
 use crate::eve::data::alliance::create_alliance;
 
+pub struct CorporationRepository {
+    db: DatabaseConnection,
+}
+
+impl CorporationRepository {
+    pub fn new(db: DatabaseConnection) -> Self {
+        Self { db }
+    }
+
+    pub async fn create(
+        &self,
+        corporation_id: i32,
+        corporation_name: String,
+        alliance_id: Option<i32>,
+        ceo: i32,
+    ) -> Result<Corporation, sea_orm::DbErr> {
+        let new_corporation = entity::eve_corporation::ActiveModel {
+            corporation_id: Set(corporation_id),
+            corporation_name: Set(corporation_name),
+            alliance_id: Set(alliance_id),
+            ceo: Set(ceo),
+            last_updated: Set(chrono::Utc::now().naive_utc()),
+            ..Default::default()
+        };
+
+        new_corporation.insert(&self.db).await
+    }
+
+    pub async fn get_one(
+        &self,
+        corporation_id: i32,
+    ) -> Result<Option<Corporation>, sea_orm::DbErr> {
+        EveCorporation::find()
+            .filter(entity::eve_corporation::Column::CorporationId.eq(corporation_id))
+            .one(&self.db)
+            .await
+    }
+
+    pub async fn get_many(
+        &self,
+        corporation_ids: &[i32],
+    ) -> Result<Vec<Corporation>, sea_orm::DbErr> {
+        let corporation_ids: Vec<sea_orm::Value> =
+            corporation_ids.iter().map(|&id| id.into()).collect();
+
+        EveCorporation::find()
+            .filter(entity::eve_corporation::Column::CorporationId.is_in(corporation_ids))
+            .all(&self.db)
+            .await
+    }
+}
+
 pub async fn get_corporation(
     db: &DatabaseConnection,
     corporation_id: i32,
