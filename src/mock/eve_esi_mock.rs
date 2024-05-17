@@ -2,14 +2,15 @@
 // This avoids dependency on eve esi which could cause tests to fail if there are any issues with the API
 
 use chrono::Utc;
-
-use crate::error::DbOrReqwestError;
+use eve_esi::model::{
+    alliance::Alliance,
+    character::{Character, CharacterAffiliation},
+    corporation::Corporation,
+};
 
 pub async fn get_alliance(
     _alliance_id: i32,
-) -> Result<eve_esi::model::alliance::Alliance, DbOrReqwestError> {
-    use eve_esi::model::alliance::Alliance;
-
+) -> Result<eve_esi::model::alliance::Alliance, reqwest::Error> {
     Ok(Alliance {
         creator_corporation_id: 109299958,
         creator_id: 180548812,
@@ -23,11 +24,9 @@ pub async fn get_alliance(
 
 pub async fn get_corporation(
     _corporation_id: i32,
-) -> Result<eve_esi::model::corporation::Corporation, DbOrReqwestError> {
-    use eve_esi::model::corporation::Corporation;
-
+) -> Result<eve_esi::model::corporation::Corporation, reqwest::Error> {
     Ok(Corporation {
-        alliance_id: Some(434243723),
+        alliance_id: None,
         ceo_id: 180548812,
         creator_id: 180548812,
         date_founded: None,
@@ -46,9 +45,7 @@ pub async fn get_corporation(
 
 pub async fn get_character(
     _character_id: i32,
-) -> Result<eve_esi::model::character::Character, DbOrReqwestError> {
-    use eve_esi::model::character::Character;
-
+) -> Result<eve_esi::model::character::Character, reqwest::Error> {
     Ok(Character {
         name: "CCP Hellmar".to_string(),
         alliance_id: Some(434243723),
@@ -62,4 +59,23 @@ pub async fn get_character(
         security_status: None,
         title: None,
     })
+}
+
+pub async fn get_character_affiliations(
+    character_ids: Vec<i32>,
+) -> Result<Vec<CharacterAffiliation>, reqwest::Error> {
+    let mut affiliations = Vec::new();
+
+    for character_id in character_ids {
+        let affiliation = CharacterAffiliation {
+            character_id,
+            corporation_id: 109299958,
+            allliance_id: Some(434243723),
+            faction_id: None,
+        };
+
+        affiliations.push(affiliation);
+    }
+
+    Ok(affiliations)
 }

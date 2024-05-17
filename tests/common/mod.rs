@@ -1,12 +1,13 @@
 use std::env;
 
-use black_rose_auth_api::{auth::data, eve::service::character::get_or_create_character};
+use black_rose_auth_api::{
+    auth::data,
+    eve::service::{affiliation::update_affiliation, character::get_or_create_character},
+};
 use eve_esi::initialize_eve_esi;
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Schema, Statement};
 
-use black_rose_auth_api::{
-    auth::data::user::update_ownership, eve::data::character::update_affiliation,
-};
+use black_rose_auth_api::auth::data::user::update_ownership;
 
 pub async fn create_tables(db: &DatabaseConnection) -> Result<(), sea_orm::DbErr> {
     dotenv::dotenv().ok();

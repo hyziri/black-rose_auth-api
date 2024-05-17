@@ -1,8 +1,6 @@
-pub mod affiliation;
-
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait,
-    QueryFilter, Set,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
+    Set,
 };
 use std::collections::HashSet;
 
@@ -37,6 +35,29 @@ impl<'a> CharacterRepository<'a> {
         };
 
         character.insert(self.db).await
+    }
+
+    pub async fn update(
+        &self,
+        character_id: i32,
+        new_corporation_id: i32,
+    ) -> Result<Character, sea_orm::DbErr> {
+        let character = self.get_one(character_id).await?;
+
+        match character {
+            Some(character) => {
+                let mut character: entity::eve_character::ActiveModel = character.into();
+
+                character.corporation_id = Set(new_corporation_id);
+                character.last_updated = Set(chrono::Utc::now().naive_utc());
+
+                character.update(self.db).await
+            }
+            None => Err(sea_orm::DbErr::RecordNotFound(format!(
+                "Character with id {} not found",
+                character_id
+            ))),
+        }
     }
 
     pub async fn get_one(&self, id: i32) -> Result<Option<Character>, sea_orm::DbErr> {
@@ -153,36 +174,6 @@ pub async fn bulk_get_character_affiliations(
     }
 
     Ok(character_affiliations)
-}
-
-pub async fn update_affiliation(
-    db: &DatabaseConnection,
-    character_ids: Vec<i32>,
-) -> Result<(), anyhow::Error> {
-    let repo = CharacterRepository::new(db);
-
-    let character_ids_len = character_ids.len() as u64;
-
-    let filters = vec![entity::eve_character::Column::CharacterId.is_in(character_ids.clone())];
-
-    let characters = repo.get_by_filtered(filters, 0, character_ids_len).await?;
-    let affiliations = eve_esi::character::get_character_affiliations(character_ids).await?;
-
-    for character in characters {
-        let affiliation = affiliations
-            .iter()
-            .find(|affiliation| affiliation.character_id == character.character_id);
-
-        if let Some(affiliation) = affiliation {
-            let mut character: entity::eve_character::ActiveModel = character.into();
-
-            character.corporation_id = ActiveValue::Set(affiliation.corporation_id);
-
-            character.update(db).await?;
-        }
-    }
-
-    Ok(())
 }
 
 #[cfg(test)]

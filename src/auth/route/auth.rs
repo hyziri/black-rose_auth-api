@@ -14,10 +14,10 @@ use serde::Deserialize;
 use std::env;
 use tower_sessions::Session;
 
-use crate::auth::data::user::{
-    create_user, get_user_character_ownership_by_ownerhash, update_ownership,
+use crate::{
+    auth::data::user::{create_user, get_user_character_ownership_by_ownerhash, update_ownership},
+    eve::service::affiliation::update_affiliation,
 };
-use crate::eve::data::character::update_affiliation;
 use crate::{
     auth::data::user::{update_user_as_admin, update_user_main},
     eve::service::character::get_or_create_character,
