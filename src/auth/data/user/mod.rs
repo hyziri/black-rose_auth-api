@@ -1,3 +1,5 @@
+pub mod ownership;
+
 use chrono::Utc;
 use sea_orm::DbErr;
 use sea_orm::{
@@ -7,9 +9,52 @@ use std::collections::HashMap;
 
 use entity::auth_user::Model as User;
 use entity::auth_user_character_ownership::Model as UserCharacterOwnership;
+use entity::prelude::AuthUser;
 
 use crate::auth::model::user::{UserAffiliations, UserGroups};
 use crate::eve::service::affiliation::get_character_affiliations;
+
+pub struct UserRepository<'a> {
+    db: &'a DatabaseConnection,
+}
+
+impl<'a> UserRepository<'a> {
+    pub fn new(db: &'a DatabaseConnection) -> Self {
+        Self { db }
+    }
+
+    pub async fn create(&self, admin: bool) -> Result<User, sea_orm::DbErr> {
+        let user = entity::auth_user::ActiveModel {
+            admin: Set(admin),
+            created: Set(Utc::now().naive_utc()),
+            ..Default::default()
+        };
+
+        user.insert(self.db).await
+    }
+
+    pub async fn get_one(&self, id: i32) -> Result<Option<User>, sea_orm::DbErr> {
+        AuthUser::find_by_id(id).one(self.db).await
+    }
+
+    pub async fn update(&self, user_id: i32, admin: bool) -> Result<User, sea_orm::DbErr> {
+        let user = self.get_one(user_id).await?;
+
+        match user {
+            Some(user) => {
+                let mut user: entity::auth_user::ActiveModel = user.into();
+
+                user.admin = Set(admin);
+
+                user.update(self.db).await
+            }
+            None => Err(sea_orm::DbErr::RecordNotFound(format!(
+                "User with id {} not found",
+                user_id
+            ))),
+        }
+    }
+}
 
 pub async fn create_user(db: &DatabaseConnection) -> Result<i32, DbErr> {
     let user = entity::auth_user::ActiveModel {
