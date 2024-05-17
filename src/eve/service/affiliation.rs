@@ -1,20 +1,24 @@
+use std::collections::HashSet;
+
 use sea_orm::DatabaseConnection;
 
 use sea_orm::ColumnTrait;
 
 use crate::error::DbOrReqwestError;
+use crate::eve::data::alliance::AllianceRepository;
 use crate::eve::data::character::CharacterRepository;
-
-#[cfg(not(test))]
-use eve_esi::character::get_character_affiliations;
-
-#[cfg(test)]
-use crate::mock::eve_esi_mock::get_character_affiliations;
+use crate::eve::data::corporation::CorporationRepository;
+use crate::eve::model::character::CharacterAffiliationDto;
 
 pub async fn update_affiliation(
     db: &DatabaseConnection,
     character_ids: Vec<i32>,
 ) -> Result<(), DbOrReqwestError> {
+    #[cfg(test)]
+    use crate::mock::eve_esi_mock::get_character_affiliations;
+    #[cfg(not(test))]
+    use eve_esi::character::get_character_affiliations;
+
     let repo = CharacterRepository::new(db);
 
     let character_ids_len = character_ids.len() as u64;
@@ -36,6 +40,114 @@ pub async fn update_affiliation(
     }
 
     Ok(())
+}
+
+pub async fn get_character_affiliations(
+    db: &DatabaseConnection,
+    character_ids: Vec<i32>,
+) -> Result<Vec<CharacterAffiliationDto>, DbOrReqwestError> {
+    async fn get_characters(
+        db: &DatabaseConnection,
+        character_ids: Vec<i32>,
+    ) -> Result<Vec<entity::eve_character::Model>, sea_orm::DbErr> {
+        let character_repo = CharacterRepository::new(db);
+
+        let character_ids_len = character_ids.len() as u64;
+
+        let filters = vec![entity::eve_character::Column::CharacterId.is_in(character_ids)];
+
+        let characters = character_repo
+            .get_by_filtered(filters, 0, character_ids_len)
+            .await?;
+
+        Ok(characters)
+    }
+
+    async fn get_corporations(
+        db: &DatabaseConnection,
+        corporation_ids: HashSet<i32>,
+    ) -> Result<Vec<entity::eve_corporation::Model>, sea_orm::DbErr> {
+        let corporation_repo = CorporationRepository::new(db);
+
+        let unique_corporation_ids: Vec<i32> = corporation_ids.into_iter().collect();
+
+        let corporation_ids_len = unique_corporation_ids.len() as u64;
+
+        let filters =
+            vec![entity::eve_corporation::Column::CorporationId.is_in(unique_corporation_ids)];
+
+        let corporations = corporation_repo
+            .get_by_filtered(filters, 0, corporation_ids_len)
+            .await?;
+
+        Ok(corporations)
+    }
+
+    async fn get_alliances(
+        db: &DatabaseConnection,
+        alliance_ids: HashSet<i32>,
+    ) -> Result<Vec<entity::eve_alliance::Model>, sea_orm::DbErr> {
+        let alliance_repo = AllianceRepository::new(db);
+
+        let unique_alliance_ids: Vec<i32> = alliance_ids.into_iter().collect();
+
+        let alliance_ids_len = unique_alliance_ids.len() as u64;
+
+        let filters =
+            vec![entity::eve_alliance::Column::AllianceId.is_in(unique_alliance_ids.to_owned())];
+
+        let alliances = alliance_repo
+            .get_by_filtered(filters, 0, alliance_ids_len)
+            .await?;
+
+        Ok(alliances)
+    }
+
+    let characters = get_characters(db, character_ids).await?;
+
+    let corporations =
+        get_corporations(db, characters.iter().map(|c| c.corporation_id).collect()).await?;
+
+    let alliances = get_alliances(
+        db,
+        corporations.iter().filter_map(|c| c.alliance_id).collect(),
+    )
+    .await?;
+
+    let mut character_affiliations: Vec<CharacterAffiliationDto> = Vec::new();
+
+    for character in characters {
+        let corporation = corporations
+            .iter()
+            .find(|corporation| corporation.corporation_id == character.corporation_id)
+            .unwrap();
+
+        let mut alliance_id = None::<i32>;
+        let mut alliance_name = None::<String>;
+
+        if let Some(character_alliance_id) = corporation.alliance_id {
+            let alliance = alliances
+                .iter()
+                .find(|alliance| alliance.alliance_id == character_alliance_id)
+                .unwrap();
+
+            alliance_id = Some(alliance.alliance_id);
+            alliance_name = Some(alliance.alliance_name.clone());
+        }
+
+        let new_character = CharacterAffiliationDto {
+            character_id: character.character_id,
+            character_name: character.character_name,
+            corporation_id: corporation.corporation_id,
+            corporation_name: corporation.corporation_name.clone(),
+            alliance_id,
+            alliance_name,
+        };
+
+        character_affiliations.push(new_character);
+    }
+
+    Ok(character_affiliations)
 }
 
 #[cfg(test)]
