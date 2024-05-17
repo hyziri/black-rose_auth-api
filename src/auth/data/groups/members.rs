@@ -1,3 +1,5 @@
+use std::vec;
+
 use anyhow::anyhow;
 use migration::OnConflict;
 use sea_orm::{
@@ -10,7 +12,7 @@ use crate::{
         data::groups::filters::validate_group_members,
         model::{groups::GroupApplicationDto, user::UserDto},
     },
-    eve::data::character::bulk_get_characters,
+    eve::data::character::CharacterRepository,
 };
 
 use entity::sea_orm_active_enums::{GroupApplicationStatus, GroupApplicationType, GroupType};
@@ -39,7 +41,13 @@ pub async fn get_group_members(
         .map(|user| user.character_id)
         .collect::<Vec<i32>>();
 
-    let characters = bulk_get_characters(db, character_ids).await?;
+    let repo = CharacterRepository::new(db);
+
+    let character_ids_len = character_ids.len() as u64;
+
+    let filters = vec![entity::eve_character::Column::CharacterId.is_in(character_ids)];
+
+    let characters = repo.get_by_filtered(filters, 0, character_ids_len).await?;
 
     let characters = characters
         .iter()

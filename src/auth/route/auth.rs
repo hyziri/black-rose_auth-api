@@ -14,12 +14,14 @@ use serde::Deserialize;
 use std::env;
 use tower_sessions::Session;
 
-use crate::auth::data::user::{
-    create_user, get_user_character_ownership_by_ownerhash, update_ownership,
+use crate::{
+    auth::data::user::{create_user, get_user_character_ownership_by_ownerhash, update_ownership},
+    eve::service::affiliation::update_affiliation,
 };
-use crate::auth::data::user::{update_user_as_admin, update_user_main};
-use crate::eve::data::character::create_character;
-use crate::eve::data::character::update_affiliation;
+use crate::{
+    auth::data::user::{update_user_as_admin, update_user_main},
+    eve::service::character::get_or_create_character,
+};
 use entity::auth_user_character_ownership::Model as CharacterOwnership;
 
 #[derive(Deserialize)]
@@ -124,7 +126,7 @@ pub async fn callback(
         let id_str = token_claims.claims.sub.split(':').collect::<Vec<&str>>()[2];
         let character_id: i32 = id_str.parse().expect("Failed to parse id to i32");
 
-        let character = create_character(db, character_id, Some(token_claims.claims.name)).await?;
+        let character = get_or_create_character(db, character_id).await?;
 
         if Utc::now().naive_utc() - character.last_updated > Duration::hours(1) {
             update_affiliation(db, vec![character_id]).await?

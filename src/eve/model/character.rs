@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-#[derive(Serialize, Deserialize, ToSchema, Clone)]
+#[derive(Serialize, Deserialize, ToSchema, Clone, PartialEq, Debug)]
 pub struct CharacterAffiliationDto {
     pub character_id: i32,
     pub character_name: String,

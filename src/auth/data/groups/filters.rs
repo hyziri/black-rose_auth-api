@@ -20,7 +20,10 @@ use crate::{
             user::{UserAffiliations, UserGroups},
         },
     },
-    eve::data::{alliance::bulk_get_alliances, corporation::bulk_get_corporations},
+    eve::{
+        data::{alliance::AllianceRepository, corporation::CorporationRepository},
+        service::{alliance::get_or_create_alliance, corporation::get_or_create_corporation},
+    },
 };
 
 pub async fn validate_filter_rules(
@@ -51,8 +54,6 @@ pub async fn validate_filter_rules(
                 }
             }
             GroupFilterCriteria::Corporation => {
-                use crate::eve::data::corporation::create_corporation;
-
                 if rule.criteria_type != GroupFilterCriteriaType::Is
                     && rule.criteria_type != GroupFilterCriteriaType::IsNot
                 {
@@ -68,20 +69,9 @@ pub async fn validate_filter_rules(
                     }
                 };
 
-                match create_corporation(db, corporation_id).await {
-                    Ok(_) => (),
-                    Err(err) => {
-                        if err.is::<reqwest::Error>() {
-                            return Err(anyhow!("Corporation not found: {}", rule.criteria_value));
-                        }
-
-                        return Err(err);
-                    }
-                };
+                get_or_create_corporation(db, corporation_id).await?;
             }
             GroupFilterCriteria::Alliance => {
-                use crate::eve::data::alliance::create_alliance;
-
                 if rule.criteria_type != GroupFilterCriteriaType::Is
                     && rule.criteria_type != GroupFilterCriteriaType::IsNot
                 {
@@ -95,16 +85,7 @@ pub async fn validate_filter_rules(
                     Err(_) => return Err(anyhow!("Invalid alliance id: {}", rule.criteria_value)),
                 };
 
-                match create_alliance(db, alliance_id).await {
-                    Ok(_) => (),
-                    Err(err) => {
-                        if err.is::<reqwest::Error>() {
-                            return Err(anyhow!("Alliance not found: {}", rule.criteria_value));
-                        }
-
-                        return Err(err);
-                    }
-                };
+                get_or_create_alliance(db, alliance_id).await?;
             }
             GroupFilterCriteria::Role => {
                 if rule.criteria_type != GroupFilterCriteriaType::Is
@@ -241,7 +222,19 @@ pub async fn validate_group_members(
                     }
 
                     if corporations.is_empty() {
-                        corporations = bulk_get_corporations(db, corporation_ids.clone()).await?;
+                        let corporation_repo = CorporationRepository::new(db);
+
+                        let ids: Vec<sea_orm::Value> =
+                            corporation_ids.iter().map(|&id| id.into()).collect();
+
+                        let corporation_ids_len = corporation_ids.len() as u64;
+
+                        let filters =
+                            vec![entity::eve_corporation::Column::CorporationId.is_in(ids)];
+
+                        corporations = corporation_repo
+                            .get_by_filtered(filters, 0, corporation_ids_len)
+                            .await?;
                     }
 
                     let leadership_ids: Vec<i32> = match filter.criteria_value.as_str() {
@@ -254,11 +247,18 @@ pub async fn validate_group_members(
                             if executor_ids.is_empty() {
                                 let alliance_ids = corporations.iter()
                                     .filter_map(|corp| corp.alliance_id)
-                                    .collect();
+                                    .collect::<Vec<i32>>();
 
-                                executor_ids = bulk_get_alliances(db, alliance_ids).await?.iter()
-                                    .filter_map(|alliance| alliance.executor)
-                                    .collect();
+                                let alliance_repo = AllianceRepository::new(db);
+
+                                let alliance_ids_len = alliance_ids.len() as u64;
+
+                                let filters =
+                                vec![entity::eve_alliance::Column::AllianceId.is_in(alliance_ids)];
+
+                                executor_ids = alliance_repo.get_by_filtered(filters, 0, alliance_ids_len).await?.iter()
+                                .filter_map(|alliance| alliance.executor)
+                                .collect();
                             }
 
                             corporations

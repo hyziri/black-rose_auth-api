@@ -4,6 +4,7 @@ use axum::{
     routing::get,
     Extension, Json, Router,
 };
+use sea_orm::ColumnTrait;
 use std::collections::HashSet;
 use tower_sessions::Session;
 
@@ -15,7 +16,7 @@ use crate::{
         },
         model::user::UserDto,
     },
-    eve::data::character::{bulk_get_character_affiliations, get_character},
+    eve::{data::character::CharacterRepository, service::affiliation::get_character_affiliations},
 };
 
 pub fn user_routes() -> Router {
@@ -72,8 +73,12 @@ pub async fn get_user(
         }
     };
 
-    match get_character(&db, main_character.character_id).await {
-        Ok(character) => match character {
+    let repo = CharacterRepository::new(&db);
+
+    let filters = vec![entity::eve_character::Column::CharacterId.eq(main_character.character_id)];
+
+    match repo.get_by_filtered(filters, 0, 1).await {
+        Ok(mut character) => match character.pop() {
             Some(character) => {
                 let user_info = UserDto {
                     id: user_id,
@@ -133,7 +138,7 @@ pub async fn get_user_main_character(
         }
     };
 
-    match bulk_get_character_affiliations(&db, vec![main_character.character_id]).await {
+    match get_character_affiliations(&db, vec![main_character.character_id]).await {
         Ok(affiliation) => {
             if affiliation.is_empty() {
                 (StatusCode::NOT_FOUND, "Character info not found.").into_response()
@@ -196,7 +201,7 @@ pub async fn get_user_characters(
         .collect();
     let unique_character_ids: Vec<i32> = character_ids.into_iter().collect();
 
-    match bulk_get_character_affiliations(&db, unique_character_ids).await {
+    match get_character_affiliations(&db, unique_character_ids).await {
         Ok(character_affiliations) => {
             if character_affiliations.is_empty() {
                 (StatusCode::NOT_FOUND, "No characters found for user").into_response()

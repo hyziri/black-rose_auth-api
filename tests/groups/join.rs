@@ -228,20 +228,8 @@ async fn test_filter(group: NewGroupDto) -> Result<(), anyhow::Error> {
 async fn group_filter() -> Result<(), anyhow::Error> {
     let db = Database::connect("sqlite::memory:").await?;
     create_tables(&db).await?;
-    let eligible_user_id = create_user(
-        &db,
-        2118500443,
-        Some("Elite Drake Pilot".to_string()),
-        "test".to_string(),
-    )
-    .await?;
-    let ineligible_user_id = create_user(
-        &db,
-        2122013871,
-        Some("Rytsuki's Proctologist".to_string()),
-        "test2".to_string(),
-    )
-    .await?;
+    let eligible_user_id = create_user(&db, 2118500443, "test".to_string()).await?;
+    let ineligible_user_id = create_user(&db, 2122013871, "test2".to_string()).await?;
 
     let group_1 = NewGroupDto {
         name: "No Requirements".to_string(),

@@ -1,6 +1,10 @@
 mod auth;
+mod error;
 mod eve;
 mod router;
+
+#[cfg(test)]
+mod mock;
 
 use sea_orm::{Database, DatabaseConnection};
 

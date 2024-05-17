@@ -7,7 +7,7 @@ use sea_orm::{
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    auth::model::groups::GroupApplicationDto, eve::data::character::bulk_get_character_affiliations,
+    auth::model::groups::GroupApplicationDto, eve::service::affiliation::get_character_affiliations,
 };
 
 use entity::sea_orm_active_enums::{GroupApplicationStatus, GroupApplicationType, GroupType};
@@ -87,7 +87,7 @@ pub async fn get_group_application(
         .iter()
         .map(|main| main.character_id)
         .collect::<Vec<i32>>();
-    let affiliations = bulk_get_character_affiliations(db, character_ids).await?;
+    let affiliations = get_character_affiliations(db, character_ids).await?;
 
     let mut applications_map: HashMap<i32, _> = applications
         .into_iter()
