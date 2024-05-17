@@ -7,14 +7,15 @@ use sea_orm::{
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    auth::model::groups::GroupApplicationDto, eve::service::affiliation::get_character_affiliations,
+    auth::{data::user::UserRepository, model::groups::GroupApplicationDto},
+    eve::service::affiliation::get_character_affiliations,
 };
 
 use entity::sea_orm_active_enums::{GroupApplicationStatus, GroupApplicationType, GroupType};
 
 use super::get_group_by_id;
 
-use crate::auth::data::user::{bulk_get_user_main_characters, get_user};
+use crate::auth::data::user::bulk_get_user_main_characters;
 use entity::auth_group_application::Model as GroupApplication;
 
 pub async fn get_group_application(
@@ -37,7 +38,9 @@ pub async fn get_group_application(
     };
 
     if let Some(user_id) = user_id {
-        match get_user(db, user_id).await? {
+        let user_repo = UserRepository::new(db);
+
+        match user_repo.get_one(user_id).await? {
             Some(_) => (),
             None => return Err(anyhow!("User does not exist")),
         };

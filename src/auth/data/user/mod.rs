@@ -71,25 +71,6 @@ impl<'a> UserRepository<'a> {
     }
 }
 
-pub async fn create_user(db: &DatabaseConnection) -> Result<i32, DbErr> {
-    let user = entity::auth_user::ActiveModel {
-        admin: Set(false),
-        created: Set(Utc::now().naive_utc()),
-        ..Default::default()
-    };
-
-    let user: User = user.insert(db).await?;
-
-    Ok(user.id)
-}
-
-pub async fn get_user(db: &DatabaseConnection, user_id: i32) -> Result<Option<User>, DbErr> {
-    entity::prelude::AuthUser::find()
-        .filter(entity::auth_user::Column::Id.eq(user_id))
-        .one(db)
-        .await
-}
-
 pub async fn get_user_main_character(
     db: &DatabaseConnection,
     user_id: i32,
@@ -324,35 +305,6 @@ pub async fn update_user_main(
     }
 
     Ok(None)
-}
-
-pub async fn update_user_as_admin(
-    db: &DatabaseConnection,
-    user_id: i32,
-) -> Result<Option<User>, DbErr> {
-    let user = entity::prelude::AuthUser::find_by_id(user_id)
-        .one(db)
-        .await?;
-
-    match user {
-        Some(user) => {
-            let mut user: entity::auth_user::ActiveModel = user.into();
-
-            user.admin = Set(true);
-
-            let user = user.update(db).await?;
-
-            Ok(Some(user))
-        }
-        None => Ok(None),
-    }
-}
-
-pub async fn get_users_with_admin(db: &DatabaseConnection) -> Result<Vec<User>, DbErr> {
-    entity::prelude::AuthUser::find()
-        .filter(entity::auth_user::Column::Admin.eq(true))
-        .all(db)
-        .await
 }
 
 #[cfg(test)]

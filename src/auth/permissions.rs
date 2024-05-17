@@ -6,6 +6,8 @@ use tower_sessions::Session;
 
 use crate::auth::data;
 
+use super::data::user::UserRepository;
+
 pub async fn require_permissions(
     db: &DatabaseConnection,
     session: Session,
@@ -18,7 +20,9 @@ pub async fn require_permissions(
         None => return Err((StatusCode::NOT_FOUND, "User not found").into_response()),
     };
 
-    match data::user::get_user(db, user_id).await {
+    let user_repo = UserRepository::new(db);
+
+    match user_repo.get_one(user_id).await {
         Ok(user) => match user {
             Some(user) => {
                 if user.admin {

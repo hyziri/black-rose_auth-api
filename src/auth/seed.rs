@@ -1,9 +1,9 @@
 use rand::{distributions::Alphanumeric, Rng};
 use redis::Commands;
-use sea_orm::DatabaseConnection;
+use sea_orm::{ColumnTrait, DatabaseConnection};
 use std::env;
 
-use crate::auth::data::user::get_users_with_admin;
+use crate::auth::data::user::UserRepository;
 
 pub async fn create_admin(db: &DatabaseConnection) -> Result<(), sea_orm::DbErr> {
     fn generate_random_string() -> String {
@@ -20,7 +20,10 @@ pub async fn create_admin(db: &DatabaseConnection) -> Result<(), sea_orm::DbErr>
 
     let backend_domain = env::var("BACKEND_DOMAIN").expect("BACKEND_DOMAIN must be set!");
 
-    let existing_admin = get_users_with_admin(db).await?;
+    let user_repo = UserRepository::new(db);
+    let filters = vec![entity::auth_user::Column::Admin.eq(true)];
+
+    let existing_admin = user_repo.get_by_filtered(filters, 0, 100).await?;
 
     if existing_admin.is_empty() {
         let valkey_url = env::var("VALKEY_URL").expect("VALKEY_URL must be set!");

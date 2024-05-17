@@ -1,7 +1,7 @@
 use std::env;
 
 use black_rose_auth_api::{
-    auth::data,
+    auth::data::{self, user::UserRepository},
     eve::service::{affiliation::update_affiliation, character::get_or_create_character},
 };
 use eve_esi::initialize_eve_esi;
@@ -53,9 +53,11 @@ pub async fn create_user(
 
     update_affiliation(db, vec![character.character_id]).await?;
 
-    let user_id = data::user::create_user(db).await?;
+    let user_repo = UserRepository::new(db);
 
-    let ownership = update_ownership(db, user_id, character.character_id, ownerhash).await?;
+    let user = user_repo.create(false).await?;
+
+    let ownership = update_ownership(db, user.id, character.character_id, ownerhash).await?;
 
     Ok(ownership.user_id)
 }

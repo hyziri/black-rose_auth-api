@@ -14,13 +14,12 @@ use serde::Deserialize;
 use std::env;
 use tower_sessions::Session;
 
+use crate::{auth::data::user::update_user_main, eve::service::character::get_or_create_character};
 use crate::{
-    auth::data::user::{create_user, get_user_character_ownership_by_ownerhash, update_ownership},
+    auth::data::user::{
+        get_user_character_ownership_by_ownerhash, update_ownership, UserRepository,
+    },
     eve::service::affiliation::update_affiliation,
-};
-use crate::{
-    auth::data::user::{update_user_as_admin, update_user_main},
-    eve::service::character::get_or_create_character,
 };
 use entity::auth_user_character_ownership::Model as CharacterOwnership;
 
@@ -143,9 +142,11 @@ pub async fn callback(
                 match ownership {
                     Some(ownership) => Ok(ownership),
                     None => {
-                        let user_id = create_user(db).await?;
+                        let user_repo = UserRepository::new(db);
 
-                        Ok(update_ownership(db, user_id, character_id, ownerhash).await?)
+                        let user = user_repo.create(false).await?;
+
+                        Ok(update_ownership(db, user.id, character_id, ownerhash).await?)
                     }
                 }
             }
@@ -189,17 +190,10 @@ pub async fn callback(
         let client = redis::Client::open(format!("redis://{}", valkey_url)).unwrap();
         let mut con = client.get_connection().unwrap();
 
-        match update_user_as_admin(&db, ownership_entry.user_id).await {
-            Ok(user) => match user {
-                Some(_) => (),
-                None => {
-                    return (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        "There was an issue logging you in, please try again.",
-                    )
-                        .into_response();
-                }
-            },
+        let user_repo = UserRepository::new(&db);
+
+        match user_repo.update(ownership_entry.user_id, true).await {
+            Ok(user) => (),
             Err(err) => {
                 println!("{}", err);
 
