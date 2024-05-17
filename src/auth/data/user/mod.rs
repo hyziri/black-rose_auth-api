@@ -1,10 +1,10 @@
 pub mod ownership;
 
 use chrono::Utc;
-use sea_orm::DbErr;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
 };
+use sea_orm::{DbErr, PaginatorTrait};
 use std::collections::HashMap;
 
 use entity::auth_user::Model as User;
@@ -35,6 +35,21 @@ impl<'a> UserRepository<'a> {
 
     pub async fn get_one(&self, id: i32) -> Result<Option<User>, sea_orm::DbErr> {
         AuthUser::find_by_id(id).one(self.db).await
+    }
+
+    pub async fn get_by_filtered(
+        &self,
+        filters: Vec<migration::SimpleExpr>,
+        page: u64,
+        page_size: u64,
+    ) -> Result<Vec<User>, sea_orm::DbErr> {
+        let mut query = AuthUser::find();
+
+        for filter in filters {
+            query = query.filter(filter);
+        }
+
+        query.paginate(self.db, page_size).fetch_page(page).await
     }
 
     pub async fn update(&self, user_id: i32, admin: bool) -> Result<User, sea_orm::DbErr> {
@@ -338,4 +353,96 @@ pub async fn get_users_with_admin(db: &DatabaseConnection) -> Result<Vec<User>, 
         .filter(entity::auth_user::Column::Admin.eq(true))
         .all(db)
         .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sea_orm::{ColumnTrait, ConnectionTrait, Database, DbBackend, Schema};
+
+    async fn initialize_test(db: &DatabaseConnection) -> Result<(), sea_orm::DbErr> {
+        let schema = Schema::new(DbBackend::Sqlite);
+
+        let stmts = vec![schema.create_table_from_entity(entity::prelude::AuthUser)];
+
+        for stmt in stmts {
+            let _ = db.execute(db.get_database_backend().build(&stmt)).await?;
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn create_user() -> Result<(), sea_orm::DbErr> {
+        let db = Database::connect("sqlite::memory:").await?;
+        initialize_test(&db).await?;
+        let user_repo = UserRepository::new(&db);
+
+        let admin = true;
+
+        let created_user = user_repo.create(admin).await?;
+
+        assert_eq!(admin, created_user.admin);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn get_one_user() -> Result<(), sea_orm::DbErr> {
+        let db = Database::connect("sqlite::memory:").await?;
+        initialize_test(&db).await?;
+        let user_repo = UserRepository::new(&db);
+
+        let admin = true;
+
+        let created_user = user_repo.create(admin).await?;
+
+        let retrieved_user = user_repo.get_one(created_user.id).await?;
+
+        assert_eq!(retrieved_user.unwrap(), created_user);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn get_filtered_users() -> Result<(), sea_orm::DbErr> {
+        let db = Database::connect("sqlite::memory:").await?;
+        initialize_test(&db).await?;
+        let user_repo = UserRepository::new(&db);
+
+        let mut created_users = Vec::new();
+
+        for _ in 0..5 {
+            let admin = false;
+
+            let created_user = user_repo.create(admin).await?;
+
+            created_users.push(created_user);
+        }
+
+        let filters = vec![entity::auth_user::Column::Id.eq(created_users[0].id)];
+
+        let retrieved_users = user_repo.get_by_filtered(filters, 0, 5).await?;
+
+        assert_eq!(retrieved_users.len(), 1);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn update_user() -> Result<(), sea_orm::DbErr> {
+        let db = Database::connect("sqlite::memory:").await?;
+        initialize_test(&db).await?;
+        let user_repo = UserRepository::new(&db);
+
+        let admin = true;
+
+        let created_user = user_repo.create(admin).await?;
+
+        let updated_user = user_repo.update(created_user.id, false).await?;
+
+        assert_ne!(updated_user, created_user);
+
+        Ok(())
+    }
 }
