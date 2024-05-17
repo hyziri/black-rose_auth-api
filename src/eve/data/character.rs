@@ -31,6 +31,25 @@ impl<'a> CharacterRepository<'a> {
         character.insert(self.db).await
     }
 
+    pub async fn get_one(&self, id: i32) -> Result<Option<Character>, sea_orm::DbErr> {
+        EveCharacter::find_by_id(id).one(self.db).await
+    }
+
+    pub async fn get_by_filtered(
+        &self,
+        filters: Vec<migration::SimpleExpr>,
+        page: u64,
+        page_size: u64,
+    ) -> Result<Vec<Character>, sea_orm::DbErr> {
+        let mut query = EveCharacter::find();
+
+        for filter in filters {
+            query = query.filter(filter);
+        }
+
+        query.paginate(self.db, page_size).fetch_page(page).await
+    }
+
     pub async fn update(
         &self,
         character_id: i32,
@@ -52,25 +71,6 @@ impl<'a> CharacterRepository<'a> {
                 character_id
             ))),
         }
-    }
-
-    pub async fn get_one(&self, id: i32) -> Result<Option<Character>, sea_orm::DbErr> {
-        EveCharacter::find_by_id(id).one(self.db).await
-    }
-
-    pub async fn get_by_filtered(
-        &self,
-        filters: Vec<migration::SimpleExpr>,
-        page: u64,
-        page_size: u64,
-    ) -> Result<Vec<Character>, sea_orm::DbErr> {
-        let mut query = EveCharacter::find();
-
-        for filter in filters {
-            query = query.filter(filter);
-        }
-
-        query.paginate(self.db, page_size).fetch_page(page).await
     }
 }
 #[cfg(test)]
@@ -204,6 +204,49 @@ mod tests {
         let retrieved_characters = character_repo.get_by_filtered(filters, 0, 5).await?;
 
         assert_eq!(retrieved_characters.len(), 1);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn update_character() -> Result<(), sea_orm::DbErr> {
+        let db = Database::connect("sqlite::memory:").await?;
+        let corporation_id = initialize_test(&db).await?;
+        let character_repo = CharacterRepository::new(&db);
+        let corporation_repo = CorporationRepository::new(&db);
+
+        let mut rng = rand::thread_rng();
+
+        let character_id = rng.gen::<i32>();
+        let character_name: String = (&mut rng)
+            .sample_iter(&Alphanumeric)
+            .take(30)
+            .map(char::from)
+            .collect();
+
+        let created_character = character_repo
+            .create(character_id, character_name.clone(), corporation_id)
+            .await?;
+
+        // create new corporation first due to foreign key constraint
+        let corporation_id = rng.gen::<i32>();
+        let alliance_id = None;
+        let ceo = rng.gen::<i32>();
+        let corporation_name = rng
+            .sample_iter(&Alphanumeric)
+            .take(30)
+            .map(char::from)
+            .collect::<String>();
+
+        let new_corporation = corporation_repo
+            .create(corporation_id, corporation_name.clone(), alliance_id, ceo)
+            .await?;
+
+        let updated_character = character_repo
+            .update(created_character.id, new_corporation.corporation_id)
+            .await?;
+
+        assert_ne!(updated_character, created_character);
 
         Ok(())
     }
