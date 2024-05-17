@@ -1,6 +1,5 @@
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
-    Set,
+    ActiveModelTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, Set,
 };
 
 use entity::eve_character::Model as Character;
@@ -59,21 +58,6 @@ impl<'a> CharacterRepository<'a> {
         EveCharacter::find_by_id(id).one(self.db).await
     }
 
-    pub async fn get_many(
-        &self,
-        ids: &[i32],
-        page: u64,
-        page_size: u64,
-    ) -> Result<Vec<Character>, sea_orm::DbErr> {
-        let ids: Vec<sea_orm::Value> = ids.iter().map(|&id| id.into()).collect();
-
-        EveCharacter::find()
-            .filter(entity::eve_character::Column::Id.is_in(ids))
-            .paginate(self.db, page_size)
-            .fetch_page(page)
-            .await
-    }
-
     pub async fn get_by_filtered(
         &self,
         filters: Vec<migration::SimpleExpr>,
@@ -95,7 +79,7 @@ mod tests {
 
     use super::*;
     use rand::{distributions::Alphanumeric, Rng};
-    use sea_orm::{ConnectionTrait, Database, DbBackend, Schema};
+    use sea_orm::{ColumnTrait, ConnectionTrait, Database, DbBackend, Schema};
 
     async fn initialize_test(db: &DatabaseConnection) -> Result<i32, sea_orm::DbErr> {
         let schema = Schema::new(DbBackend::Sqlite);
@@ -179,53 +163,6 @@ mod tests {
         let retrieved_character = character_repo.get_one(created_character.id).await?;
 
         assert_eq!(retrieved_character.unwrap(), created_character);
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn get_many_characters() -> Result<(), sea_orm::DbErr> {
-        let db = Database::connect("sqlite::memory:").await?;
-        let corporation_id = initialize_test(&db).await?;
-        let character_repo = CharacterRepository::new(&db);
-
-        let mut rng = rand::thread_rng();
-        let mut created_characters = Vec::new();
-
-        let mut generated_ids = std::collections::HashSet::new();
-        for _ in 0..5 {
-            let mut character_id: i32 = rng.gen::<i32>();
-            while generated_ids.contains(&character_id) {
-                character_id = rng.gen::<i32>();
-            }
-            generated_ids.insert(character_id);
-
-            let character_name: String = (&mut rng)
-                .sample_iter(&Alphanumeric)
-                .take(30)
-                .map(char::from)
-                .collect();
-
-            let created_character = character_repo
-                .create(character_id, character_name.clone(), corporation_id)
-                .await?;
-
-            created_characters.push(created_character);
-        }
-
-        let created_character_ids = created_characters
-            .iter()
-            .map(|a| a.id)
-            .collect::<Vec<i32>>();
-
-        let mut retrieved_characters = character_repo
-            .get_many(&created_character_ids, 0, 5)
-            .await?;
-
-        created_characters.sort_by_key(|a| a.id);
-        retrieved_characters.sort_by_key(|a| a.id);
-
-        assert_eq!(retrieved_characters, created_characters);
 
         Ok(())
     }
