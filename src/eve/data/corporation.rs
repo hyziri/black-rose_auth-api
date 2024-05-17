@@ -81,8 +81,8 @@ mod tests {
         let schema = Schema::new(DbBackend::Sqlite);
 
         let stmts = vec![
-            schema.create_table_from_entity(entity::prelude::EveCorporation),
             schema.create_table_from_entity(entity::prelude::EveAlliance),
+            schema.create_table_from_entity(entity::prelude::EveCorporation),
         ];
 
         for stmt in stmts {

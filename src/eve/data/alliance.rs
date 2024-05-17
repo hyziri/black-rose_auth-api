@@ -115,6 +115,7 @@ mod tests {
         let repo = initialize_test(&db).await?;
 
         let mut rng = rand::thread_rng();
+
         let alliance_id = rng.gen::<i32>();
         let executor = Some(rng.gen::<i32>());
         let alliance_name: String = rng
