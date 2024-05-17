@@ -224,11 +224,16 @@ pub async fn validate_group_members(
                     if corporations.is_empty() {
                         let corporation_repo = CorporationRepository::new(db);
 
-                        let filters = vec![entity::eve_corporation::Column::CorporationId
-                            .is_in(corporation_ids.clone())];
+                        let ids: Vec<sea_orm::Value> =
+                            corporation_ids.iter().map(|&id| id.into()).collect();
+
+                        let corporation_ids_len = corporation_ids.len() as u64;
+
+                        let filters =
+                            vec![entity::eve_corporation::Column::CorporationId.is_in(ids)];
 
                         corporations = corporation_repo
-                            .get_by_filtered(filters, 0, corporation_ids.len() as u64)
+                            .get_by_filtered(filters, 0, corporation_ids_len)
                             .await?;
                     }
 
@@ -246,10 +251,12 @@ pub async fn validate_group_members(
 
                                 let alliance_repo = AllianceRepository::new(db);
 
-                                let filters =
-                                vec![entity::eve_alliance::Column::AllianceId.is_in(alliance_ids.clone())];
+                                let alliance_ids_len = alliance_ids.len() as u64;
 
-                                executor_ids = alliance_repo.get_by_filtered(filters, 0, alliance_ids.len() as u64).await?.iter()
+                                let filters =
+                                vec![entity::eve_alliance::Column::AllianceId.is_in(alliance_ids)];
+
+                                executor_ids = alliance_repo.get_by_filtered(filters, 0, alliance_ids_len).await?.iter()
                                 .filter_map(|alliance| alliance.executor)
                                 .collect();
                             }

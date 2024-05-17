@@ -1,15 +1,81 @@
+pub mod affiliation;
+
+use eve_esi::corporation;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set,
+    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait,
+    QueryFilter, Set,
 };
 use std::collections::HashSet;
 
 use entity::eve_character::Model as Character;
+use entity::prelude::EveCharacter;
 
 use crate::eve::{
     model::character::CharacterAffiliationDto, service::corporation::get_or_create_corporation,
 };
 
 use super::{alliance::AllianceRepository, corporation::CorporationRepository};
+
+pub struct CharacterRepository<'a> {
+    db: &'a DatabaseConnection,
+}
+
+impl<'a> CharacterRepository<'a> {
+    pub fn new(db: &'a DatabaseConnection) -> Self {
+        Self { db }
+    }
+
+    pub async fn create(
+        &self,
+        character_id: i32,
+        character_name: String,
+        corporation_id: i32,
+    ) -> Result<Character, sea_orm::DbErr> {
+        let character = entity::eve_character::ActiveModel {
+            character_id: Set(character_id),
+            character_name: Set(character_name),
+            corporation_id: Set(corporation_id),
+            last_updated: Set(chrono::Utc::now().naive_utc()),
+            ..Default::default()
+        };
+
+        character.insert(self.db).await
+    }
+
+    pub async fn get_one(&self, id: i32) -> Result<Option<Character>, sea_orm::DbErr> {
+        EveCharacter::find_by_id(id).one(self.db).await
+    }
+
+    pub async fn get_many(
+        &self,
+        ids: &[i32],
+        page: u64,
+        page_size: u64,
+    ) -> Result<Vec<Character>, sea_orm::DbErr> {
+        let ids: Vec<sea_orm::Value> = ids.iter().map(|&id| id.into()).collect();
+
+        EveCharacter::find()
+            .filter(entity::eve_alliance::Column::Id.is_in(ids))
+            .paginate(self.db, page_size)
+            .fetch_page(page)
+            .await
+    }
+
+    pub async fn get_by_filtered(
+        &self,
+        filters: Vec<migration::SimpleExpr>,
+        page: u64,
+        page_size: u64,
+    ) -> Result<Vec<Character>, sea_orm::DbErr> {
+        let mut query = EveCharacter::find();
+
+        for filter in filters {
+            query = query.filter(filter);
+        }
+
+        query.paginate(self.db, page_size).fetch_page(page).await
+    }
+}
 
 pub async fn create_character(
     db: &DatabaseConnection,
