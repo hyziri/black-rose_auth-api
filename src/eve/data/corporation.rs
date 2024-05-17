@@ -1,15 +1,10 @@
-use std::collections::HashSet;
-
 use entity::prelude::EveCorporation;
-use eve_esi::alliance::get_alliance;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
     Set,
 };
 
 use entity::eve_corporation::Model as Corporation;
-
-use super::alliance::AllianceRepository;
 
 pub struct CorporationRepository<'a> {
     db: &'a DatabaseConnection,
@@ -74,76 +69,15 @@ impl<'a> CorporationRepository<'a> {
     }
 }
 
-pub async fn get_corporation(
-    db: &DatabaseConnection,
-    corporation_id: i32,
-) -> Result<Option<Corporation>, sea_orm::DbErr> {
-    EveCorporation::find()
-        .filter(entity::eve_corporation::Column::CorporationId.eq(corporation_id))
-        .one(db)
-        .await
-}
-
-pub async fn create_corporation(
-    db: &DatabaseConnection,
-    corporation_id: i32,
-) -> Result<Corporation, anyhow::Error> {
-    match get_corporation(db, corporation_id).await? {
-        Some(corporation) => Ok(corporation),
-        None => {
-            let corporation = eve_esi::corporation::get_corporation(corporation_id).await?;
-
-            let new_corporation = entity::eve_corporation::ActiveModel {
-                corporation_id: Set(corporation_id),
-                corporation_name: Set(corporation.name),
-                alliance_id: Set(corporation.alliance_id),
-                ceo: Set(corporation.ceo_id),
-                last_updated: Set(chrono::Utc::now().naive_utc()),
-                ..Default::default()
-            };
-
-            if let Some(alliance_id) = corporation.alliance_id {
-                let alliance = get_alliance(alliance_id).await?;
-
-                let alliance_repo = AllianceRepository::new(db);
-
-                let _ = alliance_repo
-                    .create(alliance_id, alliance.name, alliance.executor_corporation_id)
-                    .await?;
-            }
-
-            let corporation: Corporation = new_corporation.insert(db).await?;
-
-            Ok(corporation)
-        }
-    }
-}
-
-pub async fn bulk_get_corporations(
-    db: &DatabaseConnection,
-    corporation_ids: Vec<i32>,
-) -> Result<Vec<Corporation>, sea_orm::DbErr> {
-    let unique_corp_ids: Vec<i32> = corporation_ids
-        .into_iter()
-        .collect::<HashSet<_>>()
-        .into_iter()
-        .collect();
-
-    entity::prelude::EveCorporation::find()
-        .filter(entity::eve_corporation::Column::CorporationId.is_in(unique_corp_ids))
-        .all(db)
-        .await
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use rand::{distributions::Alphanumeric, Rng};
     use sea_orm::{ConnectionTrait, Database, DbBackend, Schema};
 
-    #[tokio::test]
-    async fn create_corporation() -> Result<(), sea_orm::DbErr> {
-        let db = Database::connect("sqlite::memory:").await?;
+    async fn initialize_test(
+        db: &DatabaseConnection,
+    ) -> Result<CorporationRepository, sea_orm::DbErr> {
         let schema = Schema::new(DbBackend::Sqlite);
 
         let stmts = vec![
@@ -155,7 +89,13 @@ mod tests {
             let _ = db.execute(db.get_database_backend().build(&stmt)).await?;
         }
 
-        let repo = CorporationRepository::new(&db);
+        Ok(CorporationRepository::new(db))
+    }
+
+    #[tokio::test]
+    async fn create_corporation() -> Result<(), sea_orm::DbErr> {
+        let db = Database::connect("sqlite::memory:").await?;
+        let repo = initialize_test(&db).await?;
 
         let mut rng = rand::thread_rng();
 
@@ -183,18 +123,7 @@ mod tests {
     #[tokio::test]
     async fn get_one_corporation() -> Result<(), sea_orm::DbErr> {
         let db = Database::connect("sqlite::memory:").await?;
-        let schema = Schema::new(DbBackend::Sqlite);
-
-        let stmts = vec![
-            schema.create_table_from_entity(entity::prelude::EveCorporation),
-            schema.create_table_from_entity(entity::prelude::EveAlliance),
-        ];
-
-        for stmt in stmts {
-            let _ = db.execute(db.get_database_backend().build(&stmt)).await?;
-        }
-
-        let repo = CorporationRepository::new(&db);
+        let repo = initialize_test(&db).await?;
 
         let mut rng = rand::thread_rng();
 
@@ -221,18 +150,7 @@ mod tests {
     #[tokio::test]
     async fn get_many_corporations() -> Result<(), sea_orm::DbErr> {
         let db = Database::connect("sqlite::memory:").await?;
-        let schema = Schema::new(DbBackend::Sqlite);
-
-        let stmts = vec![
-            schema.create_table_from_entity(entity::prelude::EveCorporation),
-            schema.create_table_from_entity(entity::prelude::EveAlliance),
-        ];
-
-        for stmt in stmts {
-            let _ = db.execute(db.get_database_backend().build(&stmt)).await?;
-        }
-
-        let repo = CorporationRepository::new(&db);
+        let repo = initialize_test(&db).await?;
 
         let mut rng = rand::thread_rng();
         let mut created_corporations = Vec::new();
@@ -278,18 +196,7 @@ mod tests {
     #[tokio::test]
     async fn get_filtered_corporations() -> Result<(), sea_orm::DbErr> {
         let db = Database::connect("sqlite::memory:").await?;
-        let schema = Schema::new(DbBackend::Sqlite);
-
-        let stmts = vec![
-            schema.create_table_from_entity(entity::prelude::EveCorporation),
-            schema.create_table_from_entity(entity::prelude::EveAlliance),
-        ];
-
-        for stmt in stmts {
-            let _ = db.execute(db.get_database_backend().build(&stmt)).await?;
-        }
-
-        let repo = CorporationRepository::new(&db);
+        let repo = initialize_test(&db).await?;
 
         let mut rng = rand::thread_rng();
         let mut created_corporations = Vec::new();

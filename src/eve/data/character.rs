@@ -6,10 +6,10 @@ use std::collections::HashSet;
 use entity::eve_character::Model as Character;
 
 use crate::eve::{
-    data::corporation::create_corporation, model::character::CharacterAffiliationDto,
+    model::character::CharacterAffiliationDto, service::corporation::get_or_create_corporation,
 };
 
-use super::{alliance::AllianceRepository, corporation::bulk_get_corporations};
+use super::{alliance::AllianceRepository, corporation::CorporationRepository};
 
 pub async fn create_character(
     db: &DatabaseConnection,
@@ -39,7 +39,7 @@ pub async fn create_character(
                 ..Default::default()
             };
 
-            let _ = create_corporation(db, affiliation[0].corporation_id).await;
+            let _ = get_or_create_corporation(db, affiliation[0].corporation_id).await;
 
             let character: Character = character.insert(db).await?;
 
@@ -86,7 +86,15 @@ pub async fn bulk_get_character_affiliations(
         .map(|character| character.corporation_id)
         .collect();
     let unique_corporation_ids: Vec<i32> = corporation_ids.into_iter().collect();
-    let corporations = bulk_get_corporations(db, unique_corporation_ids).await?;
+
+    let corporation_repo = CorporationRepository::new(db);
+
+    let filters =
+        vec![entity::eve_corporation::Column::CorporationId.is_in(unique_corporation_ids.clone())];
+
+    let corporations = corporation_repo
+        .get_by_filtered(filters, 0, unique_corporation_ids.len() as u64)
+        .await?;
 
     let alliance_ids: HashSet<i32> = corporations
         .clone()
@@ -97,10 +105,10 @@ pub async fn bulk_get_character_affiliations(
 
     let alliance_repo = AllianceRepository::new(db);
 
-    // FILTER NEEDS TO HANDLE IS_IN
+    let filters = vec![entity::eve_alliance::Column::AllianceId.is_in(unique_alliance_ids.clone())];
 
     let alliances = alliance_repo
-        .get_many(&unique_alliance_ids, 0, unique_alliance_ids.len() as u64)
+        .get_by_filtered(filters, 0, unique_alliance_ids.len() as u64)
         .await?;
 
     let mut character_affiliations: Vec<CharacterAffiliationDto> = Vec::new();

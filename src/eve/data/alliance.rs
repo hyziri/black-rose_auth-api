@@ -72,16 +72,21 @@ mod tests {
     use rand::{distributions::Alphanumeric, Rng};
     use sea_orm::{ConnectionTrait, Database, DbBackend, Schema};
 
+    async fn initialize_test(
+        db: &DatabaseConnection,
+    ) -> Result<AllianceRepository, sea_orm::DbErr> {
+        let schema = Schema::new(DbBackend::Sqlite);
+
+        let stmt = schema.create_table_from_entity(entity::prelude::EveAlliance);
+        let _ = db.execute(db.get_database_backend().build(&stmt)).await?;
+
+        Ok(AllianceRepository::new(db))
+    }
+
     #[tokio::test]
     async fn create_alliance() -> Result<(), sea_orm::DbErr> {
         let db = Database::connect("sqlite::memory:").await?;
-
-        let schema = Schema::new(DbBackend::Sqlite);
-        let stmt = schema.create_table_from_entity(entity::prelude::EveAlliance);
-
-        let _ = db.execute(db.get_database_backend().build(&stmt)).await?;
-
-        let repo = AllianceRepository::new(&db);
+        let repo = initialize_test(&db).await?;
 
         let mut rng = rand::thread_rng();
 
@@ -107,13 +112,7 @@ mod tests {
     #[tokio::test]
     async fn get_one_alliance() -> Result<(), sea_orm::DbErr> {
         let db = Database::connect("sqlite::memory:").await?;
-
-        let schema = Schema::new(DbBackend::Sqlite);
-        let stmt = schema.create_table_from_entity(entity::prelude::EveAlliance);
-
-        let _ = db.execute(db.get_database_backend().build(&stmt)).await?;
-
-        let repo = AllianceRepository::new(&db);
+        let repo = initialize_test(&db).await?;
 
         let mut rng = rand::thread_rng();
         let alliance_id = rng.gen::<i32>();
@@ -138,13 +137,7 @@ mod tests {
     #[tokio::test]
     async fn get_many_alliances() -> Result<(), sea_orm::DbErr> {
         let db = Database::connect("sqlite::memory:").await?;
-
-        let schema = Schema::new(DbBackend::Sqlite);
-        let stmt = schema.create_table_from_entity(entity::prelude::EveAlliance);
-
-        let _ = db.execute(db.get_database_backend().build(&stmt)).await?;
-
-        let repo = AllianceRepository::new(&db);
+        let repo = initialize_test(&db).await?;
 
         let mut rng = rand::thread_rng();
         let mut created_alliances = Vec::new();
@@ -186,13 +179,7 @@ mod tests {
     #[tokio::test]
     async fn get_filtered_alliances() -> Result<(), sea_orm::DbErr> {
         let db = Database::connect("sqlite::memory:").await?;
-
-        let schema = Schema::new(DbBackend::Sqlite);
-        let stmt = schema.create_table_from_entity(entity::prelude::EveAlliance);
-
-        let _ = db.execute(db.get_database_backend().build(&stmt)).await?;
-
-        let repo = AllianceRepository::new(&db);
+        let repo = initialize_test(&db).await?;
 
         let mut rng = rand::thread_rng();
         let mut created_alliances = Vec::new();

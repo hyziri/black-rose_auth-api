@@ -13,7 +13,10 @@ use sea_orm::{
 
 use crate::{
     auth::model::groups::{GroupDto, GroupOwnerInfo, GroupOwnerType, NewGroupDto, UpdateGroupDto},
-    eve::data::alliance::AllianceRepository,
+    eve::{
+        data::alliance::AllianceRepository,
+        service::{alliance::get_or_create_alliance, corporation::get_or_create_corporation},
+    },
 };
 
 use entity::auth_group::Model as Group;
@@ -33,39 +36,16 @@ async fn validate_group_owner(
     owner_type: &GroupOwnerType,
     owner_id: Option<i32>,
 ) -> Result<(), anyhow::Error> {
-    use crate::eve::data;
-
     match owner_type {
         GroupOwnerType::Auth => (),
         GroupOwnerType::Alliance => {
-            if let Some(owner_id) = owner_id {
-                let alliance_repo = AllianceRepository::new(db);
-
-                let filters = vec![entity::eve_alliance::Column::AllianceId.eq(owner_id)];
-
-                let alliance = alliance_repo.get_by_filtered(filters, 0, 1).await?;
-
-                if alliance.is_empty() {
-                    let alliance = get_alliance(owner_id).await?;
-
-                    alliance_repo
-                        .create(owner_id, alliance.name, alliance.executor_corporation_id)
-                        .await?;
-                }
+            if let Some(alliance_id) = owner_id {
+                get_or_create_alliance(db, alliance_id).await?;
             }
         }
         GroupOwnerType::Corporation => {
-            if let Some(owner_id) = owner_id {
-                match data::corporation::create_corporation(db, owner_id).await {
-                    Ok(_) => (),
-                    Err(err) => {
-                        if err.is::<reqwest::Error>() {
-                            return Err(anyhow!("Corporation not found: {}", owner_id));
-                        }
-
-                        return Err(err);
-                    }
-                };
+            if let Some(corporation_id) = owner_id {
+                get_or_create_corporation(db, corporation_id).await?;
             }
         }
     }
@@ -124,7 +104,6 @@ pub async fn get_group_dto(
     // Set None to get all groups
     groups: Option<Vec<i32>>,
 ) -> Result<Vec<GroupDto>, anyhow::Error> {
-    use crate::eve::data;
     use entity::sea_orm_active_enums::GroupOwnerType;
 
     let mut group_results = vec![];
@@ -168,7 +147,8 @@ pub async fn get_group_dto(
             }
             GroupOwnerType::Corporation => {
                 if let Some(owner_id) = group.owner_id {
-                    let corporation = data::corporation::create_corporation(db, owner_id).await?;
+                    let corporation = get_or_create_corporation(db, owner_id).await?;
+
                     Some(GroupOwnerInfo {
                         id: corporation.corporation_id,
                         name: corporation.corporation_name,
