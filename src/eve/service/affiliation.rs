@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use sea_orm::DatabaseConnection;
 
 use sea_orm::ColumnTrait;
+use sea_orm::DbErr;
 
 use crate::error::DbOrReqwestError;
 use crate::eve::data::alliance::AllianceRepository;
@@ -45,7 +46,7 @@ pub async fn update_affiliation(
 pub async fn get_character_affiliations(
     db: &DatabaseConnection,
     character_ids: Vec<i32>,
-) -> Result<Vec<CharacterAffiliationDto>, DbOrReqwestError> {
+) -> Result<Vec<CharacterAffiliationDto>, DbErr> {
     async fn get_characters(
         db: &DatabaseConnection,
         character_ids: Vec<i32>,
@@ -156,7 +157,13 @@ mod tests {
 
     use crate::{
         error::DbOrReqwestError,
-        eve::data::{character::CharacterRepository, corporation::CorporationRepository},
+        eve::{
+            data::{
+                alliance::AllianceRepository, character::CharacterRepository,
+                corporation::CorporationRepository,
+            },
+            model::character::CharacterAffiliationDto,
+        },
     };
 
     #[tokio::test]
@@ -176,10 +183,10 @@ mod tests {
             let _ = db.execute(db.get_database_backend().build(&stmt)).await?;
         }
 
-        let corporation_repo = CorporationRepository::new(&db);
         let character_repo = CharacterRepository::new(&db);
+        let corporation_repo = CorporationRepository::new(&db);
 
-        // Create corporations first to avoid sqlite foreignn key contraint errors
+        // Create corporations first to avoid sqlite foreign key contraint errors
         // old corp
 
         let _ = corporation_repo
@@ -195,8 +202,6 @@ mod tests {
         let character = character_repo
             .create(2114794365, "Hyziri".to_string(), 98755360)
             .await?;
-
-        println!("{}", character.id);
 
         update_affiliation(&db, vec![character.character_id]).await?;
 
@@ -214,5 +219,61 @@ mod tests {
             ))
             .into()),
         }
+    }
+
+    #[tokio::test]
+    async fn get_character_affiliations() -> Result<(), DbOrReqwestError> {
+        use super::get_character_affiliations;
+
+        let db = Database::connect("sqlite::memory:").await?;
+        let schema = Schema::new(DbBackend::Sqlite);
+
+        let stmts = vec![
+            schema.create_table_from_entity(entity::prelude::EveCharacter),
+            schema.create_table_from_entity(entity::prelude::EveCorporation),
+            schema.create_table_from_entity(entity::prelude::EveAlliance),
+        ];
+
+        for stmt in stmts {
+            let _ = db.execute(db.get_database_backend().build(&stmt)).await?;
+        }
+
+        let character_repo = CharacterRepository::new(&db);
+        let corporation_repo = CorporationRepository::new(&db);
+        let alliance_repo = AllianceRepository::new(&db);
+
+        // Create corporation/alliance first to avoid sqlite foreign key contraint errors
+
+        let alliance = alliance_repo
+            .create(99012770, "Black Rose.".to_string(), None)
+            .await?;
+
+        let corporation = corporation_repo
+            .create(
+                98755360,
+                "Black Rose Inc.".to_string(),
+                Some(99012770),
+                2114794365,
+            )
+            .await?;
+
+        let character = character_repo
+            .create(2114794365, "Hyziri".to_string(), 98755360)
+            .await?;
+
+        let expected_result = CharacterAffiliationDto {
+            character_id: character.character_id,
+            character_name: character.character_name,
+            corporation_id: corporation.corporation_id,
+            corporation_name: corporation.corporation_name.clone(),
+            alliance_id: Some(alliance.alliance_id),
+            alliance_name: Some(alliance.alliance_name.clone()),
+        };
+
+        let mut result = get_character_affiliations(&db, vec![character.character_id]).await?;
+
+        assert_eq!(expected_result, result.pop().unwrap());
+
+        Ok(())
     }
 }

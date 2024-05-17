@@ -2,14 +2,9 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
     Set,
 };
-use std::collections::HashSet;
 
 use entity::eve_character::Model as Character;
 use entity::prelude::EveCharacter;
-
-use crate::eve::model::character::CharacterAffiliationDto;
-
-use super::{alliance::AllianceRepository, corporation::CorporationRepository};
 
 pub struct CharacterRepository<'a> {
     db: &'a DatabaseConnection,
@@ -94,90 +89,10 @@ impl<'a> CharacterRepository<'a> {
         query.paginate(self.db, page_size).fetch_page(page).await
     }
 }
-
-pub async fn bulk_get_character_affiliations(
-    db: &DatabaseConnection,
-    character_ids: Vec<i32>,
-) -> Result<Vec<CharacterAffiliationDto>, sea_orm::DbErr> {
-    let repo = CharacterRepository::new(db);
-
-    let character_ids_len = character_ids.len() as u64;
-
-    let filters = vec![entity::eve_character::Column::CharacterId.is_in(character_ids)];
-
-    let characters = repo.get_by_filtered(filters, 0, character_ids_len).await?;
-
-    let corporation_ids: HashSet<i32> = characters
-        .clone()
-        .into_iter()
-        .map(|character| character.corporation_id)
-        .collect();
-    let unique_corporation_ids: Vec<i32> = corporation_ids.into_iter().collect();
-
-    let corporation_repo = CorporationRepository::new(db);
-
-    let filters =
-        vec![entity::eve_corporation::Column::CorporationId.is_in(unique_corporation_ids.clone())];
-
-    let corporations = corporation_repo
-        .get_by_filtered(filters, 0, unique_corporation_ids.len() as u64)
-        .await?;
-
-    let alliance_ids: HashSet<i32> = corporations
-        .clone()
-        .into_iter()
-        .filter_map(|corporation| corporation.alliance_id)
-        .collect();
-    let unique_alliance_ids: Vec<i32> = alliance_ids.into_iter().collect();
-
-    let alliance_repo = AllianceRepository::new(db);
-
-    let filters = vec![entity::eve_alliance::Column::AllianceId.is_in(unique_alliance_ids.clone())];
-
-    let alliances = alliance_repo
-        .get_by_filtered(filters, 0, unique_alliance_ids.len() as u64)
-        .await?;
-
-    let mut character_affiliations: Vec<CharacterAffiliationDto> = Vec::new();
-
-    for character in characters {
-        let corporation = corporations
-            .iter()
-            .find(|corporation| corporation.corporation_id == character.corporation_id)
-            .cloned()
-            .unwrap();
-
-        let mut alliance_id = None::<i32>;
-        let mut alliance_name = None::<String>;
-
-        if let Some(character_alliance_id) = corporation.alliance_id {
-            let alliance = alliances
-                .iter()
-                .find(|alliance| alliance.alliance_id == character_alliance_id)
-                .cloned()
-                .unwrap();
-
-            alliance_id = Some(alliance.alliance_id);
-            alliance_name = Some(alliance.alliance_name);
-        }
-
-        let new_character = CharacterAffiliationDto {
-            character_id: character.character_id,
-            character_name: character.character_name,
-            corporation_id: corporation.corporation_id,
-            corporation_name: corporation.corporation_name,
-            alliance_id,
-            alliance_name,
-        };
-
-        character_affiliations.push(new_character);
-    }
-
-    Ok(character_affiliations)
-}
-
 #[cfg(test)]
 mod tests {
+    use crate::eve::data::corporation::CorporationRepository;
+
     use super::*;
     use rand::{distributions::Alphanumeric, Rng};
     use sea_orm::{ConnectionTrait, Database, DbBackend, Schema};

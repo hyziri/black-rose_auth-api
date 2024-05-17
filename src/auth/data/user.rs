@@ -9,7 +9,7 @@ use entity::auth_user::Model as User;
 use entity::auth_user_character_ownership::Model as UserCharacterOwnership;
 
 use crate::auth::model::user::{UserAffiliations, UserGroups};
-use crate::eve::data::character::bulk_get_character_affiliations;
+use crate::eve::service::affiliation::get_character_affiliations;
 
 pub async fn create_user(db: &DatabaseConnection) -> Result<i32, DbErr> {
     let user = entity::auth_user::ActiveModel {
@@ -156,7 +156,7 @@ pub async fn bulk_get_user_affiliations(
 ) -> Result<Vec<UserAffiliations>, DbErr> {
     let ownerships = bulk_get_character_ownerships(db, user_ids).await?;
     let character_ids: Vec<i32> = ownerships.iter().map(|char| char.character_id).collect();
-    let affiliations = bulk_get_character_affiliations(db, character_ids.clone()).await?;
+    let affiliations = get_character_affiliations(db, character_ids.clone()).await?;
 
     let mut user_affiliations: HashMap<i32, UserAffiliations> = HashMap::new();
     let ownerships_map: HashMap<i32, &entity::auth_user_character_ownership::Model> = ownerships
