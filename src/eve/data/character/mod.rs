@@ -1,6 +1,5 @@
 pub mod affiliation;
 
-use eve_esi::corporation;
 use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait,
     QueryFilter, Set,
@@ -10,9 +9,7 @@ use std::collections::HashSet;
 use entity::eve_character::Model as Character;
 use entity::prelude::EveCharacter;
 
-use crate::eve::{
-    model::character::CharacterAffiliationDto, service::corporation::get_or_create_corporation,
-};
+use crate::eve::model::character::CharacterAffiliationDto;
 
 use super::{alliance::AllianceRepository, corporation::CorporationRepository};
 
@@ -77,74 +74,17 @@ impl<'a> CharacterRepository<'a> {
     }
 }
 
-pub async fn create_character(
-    db: &DatabaseConnection,
-    character_id: i32,
-    character_name: Option<String>,
-) -> Result<Character, anyhow::Error> {
-    match get_character(db, character_id).await? {
-        Some(character) => Ok(character),
-        None => {
-            let character_name = match character_name {
-                Some(name) => name,
-                None => {
-                    let character = eve_esi::character::get_character(character_id).await?;
-
-                    character.name
-                }
-            };
-
-            let affiliation =
-                eve_esi::character::get_character_affiliations(vec![character_id]).await?;
-
-            let character = entity::eve_character::ActiveModel {
-                character_id: Set(character_id),
-                character_name: Set(character_name),
-                corporation_id: Set(affiliation[0].corporation_id),
-                last_updated: Set(chrono::Utc::now().naive_utc()),
-                ..Default::default()
-            };
-
-            let _ = get_or_create_corporation(db, affiliation[0].corporation_id).await;
-
-            let character: Character = character.insert(db).await?;
-
-            Ok(character)
-        }
-    }
-}
-
-pub async fn get_character(
-    db: &DatabaseConnection,
-    character_id: i32,
-) -> Result<Option<Character>, sea_orm::DbErr> {
-    entity::prelude::EveCharacter::find()
-        .filter(entity::eve_character::Column::CharacterId.eq(character_id))
-        .one(db)
-        .await
-}
-
-pub async fn bulk_get_characters(
-    db: &DatabaseConnection,
-    character_ids: Vec<i32>,
-) -> Result<Vec<Character>, sea_orm::DbErr> {
-    let unique_character_ids: Vec<i32> = character_ids
-        .into_iter()
-        .collect::<HashSet<_>>()
-        .into_iter()
-        .collect();
-
-    entity::prelude::EveCharacter::find()
-        .filter(entity::eve_character::Column::CharacterId.is_in(unique_character_ids))
-        .all(db)
-        .await
-}
-
 pub async fn bulk_get_character_affiliations(
     db: &DatabaseConnection,
     character_ids: Vec<i32>,
 ) -> Result<Vec<CharacterAffiliationDto>, sea_orm::DbErr> {
-    let characters = bulk_get_characters(db, character_ids).await?;
+    let repo = CharacterRepository::new(db);
+
+    let character_ids_len = character_ids.len() as u64;
+
+    let filters = vec![entity::eve_character::Column::CharacterId.is_in(character_ids)];
+
+    let characters = repo.get_by_filtered(filters, 0, character_ids_len).await?;
 
     let corporation_ids: HashSet<i32> = characters
         .clone()
@@ -219,7 +159,13 @@ pub async fn update_affiliation(
     db: &DatabaseConnection,
     character_ids: Vec<i32>,
 ) -> Result<(), anyhow::Error> {
-    let characters = bulk_get_characters(db, character_ids.clone()).await?;
+    let repo = CharacterRepository::new(db);
+
+    let character_ids_len = character_ids.len() as u64;
+
+    let filters = vec![entity::eve_character::Column::CharacterId.is_in(character_ids.clone())];
+
+    let characters = repo.get_by_filtered(filters, 0, character_ids_len).await?;
     let affiliations = eve_esi::character::get_character_affiliations(character_ids).await?;
 
     for character in characters {
@@ -270,7 +216,7 @@ mod tests {
             .map(char::from)
             .collect::<String>();
 
-        let corporation_repo = CorporationRepository::new(&db);
+        let corporation_repo = CorporationRepository::new(db);
 
         let _ = corporation_repo
             .create(corporation_id, corporation_name.clone(), alliance_id, ceo)

@@ -4,6 +4,7 @@ use axum::{
     routing::get,
     Extension, Json, Router,
 };
+use sea_orm::ColumnTrait;
 use std::collections::HashSet;
 use tower_sessions::Session;
 
@@ -15,7 +16,7 @@ use crate::{
         },
         model::user::UserDto,
     },
-    eve::data::character::{bulk_get_character_affiliations, get_character},
+    eve::data::character::{bulk_get_character_affiliations, CharacterRepository},
 };
 
 pub fn user_routes() -> Router {
@@ -72,8 +73,12 @@ pub async fn get_user(
         }
     };
 
-    match get_character(&db, main_character.character_id).await {
-        Ok(character) => match character {
+    let repo = CharacterRepository::new(&db);
+
+    let filters = vec![entity::eve_character::Column::CharacterId.eq(main_character.character_id)];
+
+    match repo.get_by_filtered(filters, 0, 1).await {
+        Ok(mut character) => match character.pop() {
             Some(character) => {
                 let user_info = UserDto {
                     id: user_id,
